@@ -1,0 +1,80 @@
+{
+  "environment": "prod",
+  "project": {
+    "name": "web3cdk",
+    "description": "FLOW's PRODUCTION PROJECT - Web3 CDK Production Environment"
+  },
+  "tags": {
+    "Project": "web3cdk",
+    "Environment": "prod",
+    "ManagedBy": "CDK",
+    "CostCenter": "Production",
+    "Owner": "Flow Team"
+  },
+  "s3": {
+    "versioning": true,
+    "encryption": "KMS",
+    "publicAccess": "BLOCK_ALL",
+    "lifecycleDays": 90,
+    "backupEnabled": true
+  },
+  "vpc": {
+    "maxAzs": 3,
+    "natGateways": 2,
+    "enableDnsHostnames": true,
+    "enableDnsSupport": true,
+    "cidr": "10.1.0.0/16",
+    "flowLogsEnabled": true
+  },
+  "lambda": {
+    "timeout": 30,
+    "memorySize": 512,
+    "runtime": "nodejs18.x",
+    "logRetentionDays": 30,
+    "tracingEnabled": true
+  },
+  "monitoring": {
+    "dashboardEnabled": true,
+    "alarmsEnabled": true,
+    "logInsightsEnabled": true,
+    "xrayTracingEnabled": true,
+    "logLevel": "warn"
+  },
+  "security": {
+    "encryptionAtRest": true,
+    "encryptionInTransit": true,
+    "iamRolesMinimalPermissions": true,
+    "cloudTrailEnabled": true,
+    "configEnabled": true,
+    "guardDutyEnabled": true
+  },
+  "cost": {
+    "budgetLimit": 1000,
+    "budgetThreshold": 80,
+    "anomalyDetectionEnabled": true,
+    "costAllocationTagsEnabled": true
+  },
+  "application": {
+    "stackName": "MyProdStack",
+    "appName": "bonsoleil",
+    "domainName": "web3.bon-soleil.com",
+    "useElasticIP": true,
+    "ec2KeyName": "production-key"
+  },
+  "geth": {
+    "address": "0x59d2e0E4DCf3Dc47e83364D4E9A91b310e713248",
+    "initialBalance": "50000000000000000000000000",
+    "chainId": 2019
+  },
+  "discord": {
+    "appId": "1387808015587086536",
+    "guildId": "1289727738252492851"
+  },
+  "database": {
+    "instanceClass": "t3.small",
+    "backupRetentionDays": 30
+  },
+  "nft": {
+    "chainId": 2019
+  }
+}

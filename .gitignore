@@ -1,0 +1,40 @@
+*.js
+!jest.config.js
+*.d.ts
+node_modules
+nouse
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+cdk.context.json
+
+# AWS credentials
+.env.*
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+
+# Credentials
+.env.*.local
+.env.dev.local
+.env.stg.local
+.env.production.local
+secrets/
+*.key
+*.pem
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+
+# Logs
+logs
+*.log
+npm-debug.log*

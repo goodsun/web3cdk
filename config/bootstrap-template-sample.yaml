@@ -1,0 +1,149 @@
+# CDK Bootstrap テンプレートの主要リソース抜粋
+
+Resources:
+  # S3バケット - CDKアセット保存用
+  StagingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName:
+        Fn::Sub: cdk-${Qualifier}-assets-${AWS::AccountId}-${AWS::Region}
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID:
+                Fn::If:
+                  - CreateNewKey
+                  - Fn::Sub: "${FileAssetsBucketKmsKey.Arn}"
+                  - Fn::If:
+                      - UseAwsManagedKey
+                      - Ref: AWS::NoValue
+                      - Fn::Sub: "${FileAssetsBucketKmsKeyId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: CleanupOldVersions
+            NoncurrentVersionTransitions:
+              - StorageClass: INFREQUENT_ACCESS
+                TransitionInDays: 30
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 365
+            Status: Enabled
+
+  # ECRリポジトリ - Dockerイメージ保存用
+  ContainerAssetsRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName:
+        Fn::Sub: cdk-${Qualifier}-container-assets-${AWS::AccountId}-${AWS::Region}
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Expire untagged images after 1 day",
+                "selection": {
+                  "tagStatus": "untagged",
+                  "countType": "sinceImagePushed",
+                  "countUnit": "days",
+                  "countNumber": 1
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  # IAMロール - ファイルアップロード用
+  FilePublishingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: cdk-${Qualifier}-file-publishing-role-${AWS::AccountId}-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              AWS:
+                Fn::If:
+                  - HasTrustedAccounts
+                  - Fn::Split:
+                      - ","
+                      - Fn::Sub: "${TrustedAccounts},${AWS::AccountId}"
+                  - Ref: AWS::AccountId
+      Policies:
+        - PolicyName: FilePublishingRoleDefaultPolicy
+          PolicyDocument:
+            Statement:
+              - Action:
+                  - s3:GetObject*
+                  - s3:GetBucket*
+                  - s3:GetEncryptionConfiguration
+                  - s3:List*
+                  - s3:DeleteObject*
+                  - s3:PutObject*
+                  - s3:Abort*
+                Resource:
+                  - Fn::Sub: "${StagingBucket.Arn}"
+                  - Fn::Sub: "${StagingBucket.Arn}/*"
+                Effect: Allow
+
+  # IAMロール - CloudFormation実行用
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: cdk-${Qualifier}-cfn-exec-role-${AWS::AccountId}-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+      ManagedPolicyArns:
+        Fn::If:
+          - HasCloudFormationExecutionPolicies
+          - Ref: CloudFormationExecutionPolicies
+          - - Fn::Sub: "arn:${AWS::Partition}:iam::aws:policy/AdministratorAccess"
+
+  # SSMパラメータ - Bootstrapバージョン管理
+  CdkBootstrapVersion:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Name:
+        Fn::Sub: /cdk-bootstrap/${Qualifier}/version
+      Value: "22"
+
+Outputs:
+  BucketName:
+    Description: The name of the S3 bucket owned by the CDK toolkit stack
+    Value:
+      Fn::Sub: "${StagingBucket}"
+  
+  BucketDomainName:
+    Description: The domain name of the S3 bucket owned by the CDK toolkit stack
+    Value:
+      Fn::Sub: "${StagingBucket.RegionalDomainName}"
+  
+  BootstrapVersion:
+    Description: The version of the bootstrap resources that are currently mastered in this stack
+    Value:
+      Fn::GetAtt: [CdkBootstrapVersion, Value]
+  
+  ImageRepositoryName:
+    Description: The name of the ECR repository which hosts docker image assets
+    Value:
+      Fn::Sub: "${ContainerAssetsRepository}"

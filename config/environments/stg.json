@@ -1,0 +1,77 @@
+{
+  "environment": "stg",
+  "project": {
+    "name": "web3cdk",
+    "description": "FLOW's STAGING PROJECT - Web3 CDK Staging Environment"
+  },
+  "tags": {
+    "Project": "web3cdk",
+    "Environment": "stg",
+    "ManagedBy": "CDK",
+    "CostCenter": "Staging",
+    "Owner": "Flow Team"
+  },
+  "s3": {
+    "versioning": true,
+    "encryption": "S3_MANAGED",
+    "publicAccess": "BLOCK_ALL",
+    "lifecycleDays": 60,
+    "backupEnabled": true
+  },
+  "vpc": {
+    "maxAzs": 2,
+    "natGateways": 1,
+    "enableDnsHostnames": true,
+    "enableDnsSupport": true,
+    "cidr": "10.2.0.0/16",
+    "flowLogsEnabled": true
+  },
+  "lambda": {
+    "timeout": 30,
+    "memorySize": 512,
+    "runtime": "nodejs18.x",
+    "logRetentionDays": 14,
+    "tracingEnabled": true
+  },
+  "monitoring": {
+    "dashboardEnabled": true,
+    "alarmsEnabled": true,
+    "logInsightsEnabled": true,
+    "xrayTracingEnabled": true,
+    "logLevel": "info"
+  },
+  "security": {
+    "encryptionAtRest": true,
+    "encryptionInTransit": true,
+    "iamRolesMinimalPermissions": true,
+    "cloudTrailEnabled": true,
+    "configEnabled": true,
+    "guardDutyEnabled": false
+  },
+  "cost": {
+    "budgetLimit": 300,
+    "budgetThreshold": 75,
+    "anomalyDetectionEnabled": true,
+    "costAllocationTagsEnabled": true
+  },
+  "application": {
+    "stackName": "MyStgStack",
+    "appName": "stg_bonsoleil",
+    "domainName": "stg.bon-soleil.com",
+    "useElasticIP": true,
+    "ec2KeyName": "stg-key"
+  },
+  "geth": {
+    "address": "0x59d2e0E4DCf3Dc47e83364D4E9A91b310e713248",
+    "initialBalance": "50000000000000000000000000",
+    "chainId": 12345
+  },
+  "discord": {
+    "appId": "1387808015587086536",
+    "guildId": "1289727738252492851"
+  },
+  "database": {
+    "instanceClass": "t3.small",
+    "backupRetentionDays": 30
+  }
+}

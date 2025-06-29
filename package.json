@@ -1,0 +1,49 @@
+{
+  "name": "web3cdk",
+  "version": "1.0.0",
+  "description": "CDK for web3",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build": "tsc -p tools/tsconfig.json",
+    "watch": "tsc -p tools/tsconfig.json -w",
+    "test": "jest -c tools/jest.config.js",
+    "cdk": "cdk --app 'npx ts-node --project tools/tsconfig.json src/bin/web3cdk.ts'",
+    "setup": "./scripts/setup.sh",
+    "bootstrap": "./scripts/bootstrap.sh",
+    "list": "./scripts/list-stacks.sh",
+    "diff:dev": "./scripts/diff.sh dev",
+    "diff:stg": "./scripts/diff.sh stg",
+    "diff:prod": "./scripts/diff.sh prod",
+    "deploy:dev": "./scripts/deploy.sh dev",
+    "deploy:stg": "./scripts/deploy.sh stg",
+    "deploy:prod": "./scripts/deploy.sh prod",
+    "destroy:dev": "./scripts/destroy.sh dev",
+    "destroy:stg": "./scripts/destroy.sh stg",
+    "destroy:prod": "./scripts/destroy.sh prod",
+    "research": "./scripts/investigate-stack.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git:goodsun/web3cdk"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@types/node": "^24.0.7",
+    "aws-cdk-lib": "^2.202.0",
+    "constructs": "^10.4.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "aws-cdk": "^2.1019.2",
+    "jest": "^30.0.3",
+    "ts-jest": "^29.4.0"
+  }
+}
