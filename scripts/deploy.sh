@@ -28,21 +28,58 @@ fi
 
 # 環境変数の読み込み
 ENV_FILE=".env.${ENV}"
-if [ -f "$ENV_FILE" ]; then
-    export $(grep -v '^#' "$ENV_FILE" | sed 's/#.*//' | grep '=' | xargs)
-elif [ -f ".env.local" ]; then
-    export $(grep -v '^#' .env.local | sed 's/#.*//' | grep '=' | xargs)
+if [ ! -f "$ENV_FILE" ]; then
+    echo "❌ 環境設定ファイル $ENV_FILE が見つかりません"
+    echo ""
+    echo "💡 解決方法:"
+    echo "  1. セットアップを実行: npm run setup $ENV"
+    echo "  2. 手動で作成: cp .env.example $ENV_FILE"
+    echo ""
+    exit 1
 fi
+
+echo "📁 環境設定ファイルを読み込み中: $ENV_FILE"
+export $(grep -v '^#' "$ENV_FILE" | sed 's/#.*//' | grep '=' | xargs)
 
 # 環境変数の設定
 export CDK_ENV=$ENV
 
 # 必須環境変数のチェック
+echo ""
+echo "🔍 必須環境変数をチェック中..."
+MISSING_VARS=()
+
 if [ -z "$CDK_ACCOUNT" ]; then
-    echo "❌ CDK_ACCOUNTが設定されていません"
-    echo "まず npm run setup を実行してください"
+    MISSING_VARS+=("CDK_ACCOUNT")
+fi
+
+if [ -z "$PROJECT_NAME" ]; then
+    MISSING_VARS+=("PROJECT_NAME")
+fi
+
+if [ -z "$CDK_REGION" ]; then
+    MISSING_VARS+=("CDK_REGION")
+fi
+
+# Phase 1で必要な環境変数
+if [ -z "$EC2_KEY_NAME" ]; then
+    MISSING_VARS+=("EC2_KEY_NAME")
+fi
+
+if [ ${#MISSING_VARS[@]} -gt 0 ]; then
+    echo "❌ 以下の必須環境変数が設定されていません:"
+    for var in "${MISSING_VARS[@]}"; do
+        echo "  - $var"
+    done
+    echo ""
+    echo "💡 解決方法:"
+    echo "  1. セットアップを再実行: npm run setup $ENV"
+    echo "  2. $ENV_FILE を手動で編集"
+    echo ""
     exit 1
 fi
+
+echo "✅ 必須環境変数チェック完了"
 
 echo "📋 デプロイ設定:"
 echo "  アカウント: $CDK_ACCOUNT"
@@ -72,8 +109,13 @@ npx cdk diff
 
 # デプロイの実行
 echo ""
-echo "🚀 スタックをデプロイしています..."
-npx cdk deploy --require-approval never
+echo -e "\033[1;33m🚀 スタックをデプロイしています（全スタック一括）...\033[0m"
+echo -e "\033[34m💡 上級者向けTips: 個別デプロイも可能です\033[0m"
+echo -e "\033[35m   npx cdk deploy web3cdk-$ENV-network    # ネットワークのみ\033[0m"
+echo -e "\033[35m   npx cdk deploy web3cdk-$ENV-ec2        # EC2のみ\033[0m"  
+echo -e "\033[35m   npx cdk deploy web3cdk-$ENV-storage    # ストレージのみ\033[0m"
+echo ""
+npx cdk deploy --all --require-approval never
 
 # 結果の表示
 echo ""

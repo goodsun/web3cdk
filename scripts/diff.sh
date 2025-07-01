@@ -58,7 +58,35 @@ npm run build
 echo ""
 echo "🔍 CDK差分を確認しています..."
 echo "================================================"
-npx cdk diff --app "npx ts-node --project tools/tsconfig.json src/bin/web3cdk.ts"
+
+# CDK差分実行と結果保存
+DIFF_OUTPUT=$(npx cdk diff --app "npx ts-node --project tools/tsconfig.json src/bin/web3cdk.ts" 2>&1)
+echo "$DIFF_OUTPUT"
+
+# User Data変更による再作成の警告
+if echo "$DIFF_OUTPUT" | grep -q "may be replaced.*UserData\|UserData.*may cause replacement"; then
+    echo ""
+    echo -e "\033[1;31m⚠️  重要な注意事項 ⚠️\033[0m"
+    echo -e "\033[1;31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+    echo -e "\033[1;33m🔄 EC2インスタンスが再作成されます\033[0m"
+    echo ""
+    echo -e "\033[1;37m📋 再作成の理由:\033[0m"
+    echo -e "   \033[37m• User Data（起動スクリプト）が変更されました\033[0m"
+    echo -e "   \033[37m• 既存インスタンスでは新しい設定が適用されません\033[0m"
+    echo -e "   \033[37m• AWS CDKが自動的に古いインスタンスを削除して新規作成します\033[0m"
+    echo ""
+    echo -e "\033[1;37m💾 影響:\033[0m"
+    echo -e "   \033[33m• 現在のIPアドレスが変更される可能性があります\033[0m"
+    echo -e "   \033[33m• SSH接続は新しいIPアドレスで行ってください\033[0m"
+    echo -e "   \033[33m• インスタンス内のログ・一時ファイルは失われます\033[0m"
+    echo ""
+    echo -e "\033[1;37m🎯 デプロイ後の手順:\033[0m"
+    echo -e "   \033[32m1. 新しいIPアドレスを確認\033[0m"
+    echo -e "   \033[32m2. DNS設定を更新（ドメイン使用時）\033[0m"
+    echo -e "   \033[32m3. SSH接続テスト\033[0m"
+    echo -e "\033[1;31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+    echo ""
+fi
 
 echo ""
 echo "✅ 差分確認が完了しました！"

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { Web3CdkStack } from '../lib/web3cdk-stack';
-import { ConfigLoader } from '../lib/config/config-loader';
+import { Web3CdkStorageStack } from '../lib/web3cdk-stack';
+import { Web3CdkNetworkStack } from '../lib/web3cdk-network-stack';
+import { Web3CdkEc2Stack } from '../lib/web3cdk-ec2-stack';
 
 /**
  * CDKアプリケーションのエントリーポイント
@@ -25,31 +26,49 @@ try {
     throw new Error('Account validation failed');
   }
 
-  // 設定の読み込み
+  // 環境変数から設定を読み込み
   console.log(`🔧 Loading configuration for environment: ${environment}`);
-  const config = ConfigLoader.load(environment);
+  const projectName = process.env.PROJECT_NAME || 'web3cdk';
 
-  // スタック名の生成（設定ベース）
-  const stackName = `${config.project.name}-${environment}-stack`;
+  // 共通のスタックプロパティ
+  const baseProps = {
+    env: { account, region },
+    environment: environment,
+  };
 
   // 環境情報の表示
   console.log(`📋 Deployment Configuration:`);
   console.log(`├── Environment: ${environment}`);
   console.log(`├── Account: ${account}`);
   console.log(`├── Region: ${region}`);
-  console.log(`├── Stack Name: ${stackName}`);
-  console.log(`└── Project: ${config.project.name}`);
+  console.log(`├── Project: ${projectName}`);
+  console.log(`└── Stack Strategy: Separated`);
 
-  // スタックの作成
-  const stack = new Web3CdkStack(app, stackName, {
-    env: { account, region },
-    environment: environment,
-    config: config,
-    description: `${config.project.description} (${environment})`,
+  // Phase 1: ネットワークスタックの作成
+  const networkStack = new Web3CdkNetworkStack(app, `${projectName}-${environment}-network`, {
+    ...baseProps,
+    projectName,
+    description: `${projectName} - ネットワーク基盤 (${environment}環境)`,
   });
 
-  // 環境別の追加設定
-  applyEnvironmentSpecificSettings(stack, environment);
+  // Phase 1: EC2スタックの作成（ネットワークに依存）
+  const ec2Stack = new Web3CdkEc2Stack(app, `${projectName}-${environment}-ec2`, {
+    ...baseProps,
+    projectName,
+    description: `${projectName} - EC2サーバー (${environment}環境)`,
+    vpc: networkStack.vpc,
+    securityGroup: networkStack.securityGroup,
+  });
+
+  // Phase 2: ストレージスタックの作成（独立）
+  const storageStack = new Web3CdkStorageStack(app, `${projectName}-${environment}-storage`, {
+    ...baseProps,
+    projectName,
+    description: `${projectName} - ストレージ (${environment}環境)`,
+  });
+
+  // スタック間の依存関係を明示的に設定
+  ec2Stack.addDependency(networkStack);
 
   console.log(`✅ CDK app initialized successfully for ${environment} environment`);
 
@@ -59,22 +78,12 @@ try {
   if (error instanceof Error) {
     console.error(`   ${error.message}`);
     
-    // 設定関連のエラーの場合は詳細なヘルプを表示
-    if (error.message.includes('configuration')) {
-      console.error('\n💡 Configuration Help:');
-      console.error('   1. Ensure config files exist in config/environments/');
-      console.error('   2. Check config/defaults.json for base configuration');
+    // 環境変数関連のエラーの場合は詳細なヘルプを表示
+    if (error.message.includes('environment')) {
+      console.error('\n💡 Environment Help:');
+      console.error('   1. Ensure .env.dev file exists');
+      console.error('   2. Run setup script: npm run setup dev');
       console.error('   3. Verify environment name is one of: dev, stg, prod');
-      
-      // 利用可能な環境を表示
-      try {
-        const availableEnvs = ConfigLoader.getAvailableEnvironments();
-        if (availableEnvs.length > 0) {
-          console.error(`   4. Available environments: ${availableEnvs.join(', ')}`);
-        }
-      } catch (envError) {
-        console.error('   4. Could not list available environments');
-      }
     }
   }
   
@@ -106,27 +115,3 @@ function validateEnvironmentVariables(account: string | undefined, environment: 
   }
 }
 
-/**
- * 環境別の追加設定を適用
- */
-function applyEnvironmentSpecificSettings(stack: Web3CdkStack, environment: string): void {
-  switch (environment) {
-    case 'dev':
-      // 開発環境では詳細な設定表示
-      console.log('🔧 Development environment settings applied');
-      break;
-      
-    case 'stg':
-      // ステージング環境の設定
-      console.log('🧪 Staging environment settings applied');
-      break;
-      
-    case 'prod':
-      // 本番環境の設定（追加の検証など）
-      console.log('🔒 Production environment settings applied');
-      
-      // 本番環境では追加の警告
-      console.log('⚠️  Production deployment - please ensure all changes are reviewed');
-      break;
-  }
-}

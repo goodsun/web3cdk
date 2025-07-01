@@ -114,6 +114,56 @@ fi
 
 echo "✅ 設定が確認されました"
 
+# 現在のIPアドレスを取得してセキュリティ設定を推奨
+echo ""
+echo "🔒 セキュリティ設定の推奨事項"
+echo "==============================="
+echo ""
+echo "現在のIPアドレスを確認しています..."
+
+# 現在のグローバルIPアドレスを取得
+CURRENT_IP=""
+if command -v curl &> /dev/null; then
+    CURRENT_IP=$(curl -s https://httpbin.org/ip | grep -o '"origin": "[^"]*' | cut -d'"' -f4 2>/dev/null)
+    if [ -z "$CURRENT_IP" ]; then
+        CURRENT_IP=$(curl -s https://api.ipify.org 2>/dev/null)
+    fi
+fi
+
+if [ -n "$CURRENT_IP" ]; then
+    echo "📍 現在のグローバルIP: $CURRENT_IP"
+    echo ""
+    echo "🔧 推奨ADMIN_CIDR設定:"
+    echo "  1. 単一IP許可: ${CURRENT_IP}/32 （最も安全）"
+    echo "  2. 同一ネットワーク許可: ${CURRENT_IP%.*}.0/24 （オフィス・自宅）"
+    echo "  3. 全世界許可: 0.0.0.0/0 （開発環境・テスト用）"
+    echo ""
+    echo "💡 設定例:"
+    echo "  # 現在のIPのみ許可（推奨・最も安全）"
+    echo "  ADMIN_CIDR=${CURRENT_IP}/32"
+    echo ""
+    echo "  # 同一ネットワーク許可（オフィス・自宅ネットワーク）"
+    echo "  ADMIN_CIDR=${CURRENT_IP%.*}.0/24"
+    echo ""
+    echo "  # 全世界から許可（開発環境・動的IP環境）"
+    echo "  ADMIN_CIDR=0.0.0.0/0"
+    echo ""
+    echo "⚠️  セキュリティレベル: 1 > 2 > 3 の順で安全です"
+else
+    echo "❌ 現在のIPアドレスを取得できませんでした"
+    echo ""
+    echo "💡 手動で設定してください:"
+    echo "  1. https://whatismyipaddress.com/ でIPを確認"
+    echo "  2. 以下から選択して .env.dev を編集："
+    echo ""
+    echo "     # 特定IPのみ許可（最も安全）"
+    echo "     ADMIN_CIDR=[あなたのIP]/32"
+    echo ""
+    echo "     # 全世界から許可（開発環境・テスト用）"
+    echo "     ADMIN_CIDR=0.0.0.0/0"
+fi
+echo ""
+
 # 4. Node.jsとnpmの確認
 echo ""
 echo "4️⃣ Node.jsとnpmを確認しています..."
@@ -156,20 +206,78 @@ APP_NAME=$APP_NAME
 
 # AWSプロファイル（現在のプロファイルを自動設定）
 AWS_PROFILE=${AWS_PROFILE:-default}
+
+# セキュリティ設定
+# 管理者のIPアドレス範囲（SSH接続用）
+ADMIN_CIDR=$(if [ -n "$CURRENT_IP" ]; then echo "${CURRENT_IP}/32"; else echo "0.0.0.0/0"; fi)
+
+# EC2設定（自動生成）
+EC2_KEY_NAME=${PROJECT_NAME}-${CDK_ENV}
+USE_ELASTIC_IP=true
+# ELASTIC_IP_ALLOCATION_ID=eipalloc-xxxxx
+
+# ドメイン設定（Phase 4で使用）
+# DOMAIN_NAME=your-domain.com
+# EMAIL=admin@your-domain.com
 EOF
     echo "✅ $ENV_FILE を作成しました"
 else
     echo "ℹ️  $ENV_FILE は既に存在します"
 fi
 
-# 7. セットアップ完了
+# 7. EC2キーペアの作成
+echo ""
+echo "7️⃣ EC2キーペアを確認・作成しています..."
+
+# キーペア名を取得
+KEY_NAME="${PROJECT_NAME}-${CDK_ENV}"
+
+# キーペアの存在確認
+if aws ec2 describe-key-pairs --key-names "$KEY_NAME" --region "$CDK_REGION" &>/dev/null; then
+    echo "✅ キーペア '$KEY_NAME' は既に存在します"
+else
+    echo "🔧 キーペア '$KEY_NAME' を作成しています..."
+    
+    # ~/.sshディレクトリの作成
+    mkdir -p ~/.ssh
+    
+    # キーペアの作成
+    if aws ec2 create-key-pair --key-name "$KEY_NAME" --query 'KeyMaterial' --output text > ~/.ssh/"${KEY_NAME}.pem" 2>/dev/null; then
+        # 権限設定
+        chmod 400 ~/.ssh/"${KEY_NAME}.pem"
+        echo "✅ キーペア '$KEY_NAME' を作成しました"
+        echo "📁 秘密鍵の保存場所: ~/.ssh/${KEY_NAME}.pem"
+    else
+        echo "❌ キーペアの作成に失敗しました"
+        echo "💡 手動で作成してください: aws ec2 create-key-pair --key-name $KEY_NAME"
+        exit 1
+    fi
+fi
+
+# 8. セットアップ完了
 echo ""
 echo "✅ セットアップが完了しました！"
 echo ""
 echo "📋 次のステップ:"
 echo "1. 必要に応じて $ENV_FILE を確認・編集してください"
+if [ -n "$CURRENT_IP" ]; then
+    echo "   ✅ ADMIN_CIDR は自動的に現在のIP (${CURRENT_IP}/32) に設定されました"
+else
+    echo "   ⚠️  重要: ADMIN_CIDR を実際の管理者IPアドレスに変更してください"
+fi
+echo "   ✅ EC2_KEY_NAME: 自動設定されました (${PROJECT_NAME}-${CDK_ENV})"
+echo "   ✅ EC2キーペア: 自動作成されました"
+echo "   📝 DOMAIN_NAME: （Phase 4）ドメイン名を設定してください"
 echo "2. 環境変数を読み込む: source $ENV_FILE"
 echo "3. CDKをブートストラップ: npm run bootstrap"
 echo "4. 最初のスタックをデプロイ: npm run deploy:$CDK_ENV"
+echo ""
+echo "🔒 セキュリティノート:"
+if [ -n "$CURRENT_IP" ]; then
+    echo "   SSH接続は現在のIP (${CURRENT_IP}) からのみ許可されます"
+    echo "   IP変更時は .env.dev の ADMIN_CIDR を更新してください"
+else
+    echo "   SSH接続のセキュリティのため、ADMIN_CIDRの設定を忘れずに行ってください"
+fi
 echo ""
 echo "コーディングを楽しんでください！ 🎉"

@@ -38,3 +38,6 @@ secrets/
 logs
 *.log
 npm-debug.log*
+
+# Test directory (will be recreated in Phase 5)
+test/

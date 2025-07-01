@@ -8,12 +8,43 @@
 ## Phase 1: EC2インスタンスとドメイン・SSL設定
 
 ### ステップ1: 環境変数の準備
+
+#### 1-1. setup.shを実行
 ```bash
-# .env ファイルを作成
-EC2_KEY_NAME=your-key-pair-name
+npm run setup dev
+```
+
+#### 1-2. .env.devファイルを編集
+setup.sh実行後、以下の値を設定してください：
+
+```bash
+# 自動設定される項目
+EC2_KEY_NAME=web3cdk-dev    # PROJECT_NAME-CDK_ENVで自動生成
+ADMIN_CIDR=xxx.xxx.xxx.xxx/32  # 現在のIPで自動設定
+
+# オプション設定
+USE_ELASTIC_IP=true
+ELASTIC_IP_ALLOCATION_ID=eipalloc-xxxxx  # 既存EIPがある場合のみ
+
+# Phase 4で使用（今は設定不要）
 DOMAIN_NAME=your-domain.com
 EMAIL=admin@your-domain.com
-USE_ELASTIC_IP=true
+```
+
+#### 1-3. AWSキーペアの確認・作成
+キーペア名は自動生成されます（例：web3cdk-dev）
+
+```bash
+# 自動生成されたキーペア名の確認
+source .env.dev
+echo "キーペア名: $EC2_KEY_NAME"
+
+# 既存キーペアの確認
+aws ec2 describe-key-pairs --key-names $EC2_KEY_NAME --region ap-northeast-1
+
+# 存在しない場合は新規作成
+aws ec2 create-key-pair --key-name $EC2_KEY_NAME --query 'KeyMaterial' --output text > ~/.ssh/${EC2_KEY_NAME}.pem
+chmod 400 ~/.ssh/${EC2_KEY_NAME}.pem
 ```
 
 ### ステップ2: ネットワーク構成の実装
@@ -48,10 +79,36 @@ lib/constructs/ec2-stack.ts
 3. Let's Encrypt SSL証明書取得
 4. Apache リバースプロキシ設定
 
+### ステップ5: Phase 1のデプロイ
+
+#### 5-1. 環境変数の読み込み
+```bash
+source .env.dev
+```
+
+#### 5-2. メインスタックのデプロイ
+```bash
+npm run deploy:dev
+```
+
+#### 5-3. デプロイ結果の確認
+デプロイ完了後、以下の出力を確認：
+- VPC ID
+- EC2 Instance ID  
+- Public IP Address
+- SSH Connection Command
+
+#### 5-4. SSH接続テスト
+```bash
+# 出力されたSSH接続コマンドを実行
+ssh -i ~/.ssh/[your-key-name].pem ec2-user@[public-ip]
+```
+
 **確認項目:**
-- [ ] HTTPSアクセス可能
-- [ ] SSL証明書有効
-- [ ] ドメイン名解決確認
+- [ ] EC2インスタンス起動確認
+- [ ] SSH接続確認
+- [ ] Apache起動確認 (`systemctl status httpd`)
+- [ ] Node.js動作確認 (`node --version`)
 
 ## Phase 2: 基本インフラストラクチャ
 
