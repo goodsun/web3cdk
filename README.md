@@ -54,21 +54,27 @@ npm run destroy:dev   # 開発環境のスタック削除
 npm run destroy:stg   # ステージング環境のスタック削除
 npm run destroy:prod  # 本番環境のスタック削除
 npm run research      # 孤立スタック調査ツール
+
+# SSL証明書管理
+./scripts/download-ssl-certs.sh [環境]  # SSL証明書バックアップ（.envから自動取得）
 ```
 
 ## 📁 プロジェクト構成
 
 ```
 web3cdk/
-├── 📋 プロジェクト管理
+├── 📋 プロジェクト管理 (ルート)
 │   ├── package.json          # Node.js設定
 │   ├── README.md            # プロジェクト説明  
-│   └── LICENSE              # ライセンス
+│   ├── LICENSE              # ライセンス
+│   ├── CLAUDE.md            # Claude Code設定
+│   └── cdk.json             # CDK設定
 │
 ├── 📁 ソースコード
-│   └── src/                 # メインソースコード
-│       ├── bin/            # CDKエントリポイント
-│       └── lib/            # CDKスタック定義
+│   ├── src/                 # メインソースコード
+│   │   ├── bin/            # CDKエントリポイント
+│   │   └── lib/            # CDKスタック定義
+│   └── lib/                 # CDK構成要素（constructs）
 │
 ├── 📁 開発・運用
 │   ├── scripts/            # 管理スクリプト
@@ -78,16 +84,27 @@ web3cdk/
 │   │   ├── diff.sh         # 差分確認
 │   │   ├── deploy.sh       # デプロイメント
 │   │   ├── destroy.sh      # リソース削除
-│   │   └── investigate-stack.sh # 孤立スタック調査
-│   ├── test/              # テストファイル
-│   └── docs/              # ドキュメント
+│   │   ├── investigate-stack.sh # 孤立スタック調査
+│   │   └── download-ssl-certs.sh # SSL証明書バックアップ
+│   └── docs/               # ドキュメント（目的別整理）
+│       ├── index.md        # 📖 ドキュメント索引
+│       ├── guides/         # 📋 ガイド・マニュアル
+│       ├── design/         # 🏗️ 設計書
+│       ├── development/    # 📝 開発リソース
+│       ├── checklists/     # ✅ チェックリスト
+│       ├── planning/       # 📋 計画書
+│       └── manual/         # 📚 既存マニュアル
+│
+├── 📁 機密保管庫
+│   └── backup/             # バックアップ専用（Git管理外）
+│       ├── README.md       # 🔒 保管庫説明（Git管理）
+│       ├── ssl/           # SSL証明書バックアップ
+│       ├── database/      # DBバックアップ（将来用）
+│       └── config/        # 設定バックアップ（将来用）
 │
 └── 📁 設定ファイル
-    ├── config/             # 環境・CDK設定
-    │   ├── environments/   # 環境別設定
-    │   ├── cdk.json        # CDK設定
-    │   └── .env.*          # 環境変数
-    └── tools/              # 開発ツール設定
+    ├── .env.*             # 環境変数（Git管理外）
+    └── tools/             # 開発ツール設定
         ├── tsconfig.json   # TypeScript設定
         ├── jest.config.js  # テスト設定
         └── *.code-workspace # エディタ設定
@@ -103,17 +120,29 @@ web3cdk/
 6. **デプロイ**: `npm run deploy:dev`でデプロイ
 7. **確認**: AWS Consoleで確認
 
+## 🏗️ スタック構成
+
+本プロジェクトは以下の複数スタックで構成されています：
+
+| スタック名 | 説明 | 主なリソース |
+|-----------|------|------------|
+| `web3cdk-{env}-network` | ネットワーク基盤 | VPC, Subnet, SecurityGroup |
+| `web3cdk-{env}-ec2` | Webサーバー | EC2, ElasticIP, Apache |
+| `web3cdk-{env}-storage` | ストレージ | S3 Bucket |
+| `web3cdk-{env}-cache-api` | キャッシュAPI | Lambda, DynamoDB, API Gateway |
+| `web3cdk-{env}-bot-api` | Discord Bot API | Lambda, DynamoDB, API Gateway |
+
 ### 💡 上級者向けTips
 
-複数スタックがある場合は、CDKの標準コマンドで個別制御も可能：
+複数スタック構成なので、CDKの標準コマンドで個別制御も可能：
 
 ```bash
 # 特定スタックのみ操作
-npx cdk deploy my-api-stack      # APIスタックのみデプロイ
-npx cdk diff my-web-stack        # Webスタックの差分確認
-npx cdk destroy my-db-stack      # DBスタックのみ削除
+npx cdk deploy web3cdk-dev-cache-api    # Cache APIスタックのみデプロイ
+npx cdk diff web3cdk-dev-ec2             # EC2スタックの差分確認
+npx cdk destroy web3cdk-dev-bot-api      # Bot APIスタックのみ削除
 
-# 全体操作
+# 全体操作（推奨）
 npx cdk deploy --all             # 全スタック一括デプロイ
 npx cdk diff --all               # 全スタック差分確認
 npx cdk ls                       # スタック一覧表示
@@ -123,28 +152,63 @@ npx cdk ls                       # スタック一覧表示
 
 ## 🔧 トラブルシューティング
 
-### EC2インスタンスの強制再作成
+### EC2インスタンスのミニマルリセット（2段階方式）
 
 起動処理でうまくいかなかった場合や、インスタンスの設定を完全にリセットしたい場合：
 
 ```bash
-# 通常デプロイ（既存インスタンス維持）
-npm run deploy:dev
+# ステップ1: ミニマルインスタンスを作成（SSL証明書なし）
+EC2_MINIMAL_RESET=true npm run deploy:dev
 
-# EC2インスタンス強制再作成
-FORCE_RECREATE_EC2=true npm run deploy:dev
+# ステップ2: フル構成に自動置き換え
+npm run deploy:dev
 ```
 
-**動作：**
-- `FORCE_RECREATE_EC2=true`設定時：新しいEC2インスタンスを作成後、古いインスタンスを自動削除
-- 通常時：既存インスタンスを維持してUserDataの変更のみ適用
-- ダウンタイム最小化（新→旧の順で処理）
-- Elastic IPを使用している場合も自動で新インスタンスに関連付け
+**動作説明：**
+- **ステップ1**: 最小限のEC2インスタンスを作成（Apache/SSL設定なし）
+- **ステップ2**: UserDataの差分により、フル構成のインスタンスに自動置き換え
+
+**メリット：**
+- Let's Encrypt証明書の制限（週5回）を回避
+- 連続再作成による問題を防止
+- 安全で確実なリセット方法
 
 **使用ケース：**
 - Apache設定の初期化に失敗した場合
 - SSL証明書設定でエラーが発生した場合
 - User Dataスクリプトの実行でインスタンスが不安定になった場合
+
+**注意事項：**
+- 事前にSSHキーペアの削除が必要です
+- `EC2_MINIMAL_RESET`を設定したままだと、常にミニマルインスタンスが作成されます
+
+### SSL証明書のバックアップとリストア
+
+EC2インスタンス再作成前に、Let's Encryptで作成したSSL証明書をバックアップできます：
+
+```bash
+# SSL証明書のダウンロード（.env.devのDOMAIN_NAMEを使用）
+./scripts/download-ssl-certs.sh dev
+
+# ドメインを直接指定する場合
+./scripts/download-ssl-certs.sh dev your-domain.com
+```
+
+**ダウンロードされるファイル：**
+- `cert1.pem` - サーバー証明書
+- `chain1.pem` - 中間証明書  
+- `fullchain1.pem` - フル証明書チェーン
+- `privkey1.pem` - 秘密鍵
+
+**保存場所：** `backup/ssl/[環境]/[ドメイン]/[タイムスタンプ]/`
+
+**復元方法：**
+1. 新しいEC2インスタンスにSSH接続
+2. 証明書ファイルを `/etc/letsencrypt/archive/[ドメイン]/` にアップロード
+3. Apache設定でSSL証明書のパスを更新
+4. Apache再起動: `sudo systemctl restart httpd`
+
+**注意：** 証明書の有効期限は通常3ヶ月です。期限切れの場合は新しい証明書を取得してください。
 
 ### 孤立スタックの調査・削除
 
@@ -172,8 +236,25 @@ npm run research myprod
 
 ## 📖 詳細ドキュメント
 
-- [プロジェクト設計書](docs/project-design.md)
-- [CDK Bootstrap ガイド](docs/cdk-bootstrap-guide.md)
+### 📋 ガイド・マニュアル
+- [CDK Bootstrap ガイド](docs/guides/cdk-bootstrap-guide.md)
+- [移行手順書](docs/guides/migration-step-by-step.md)
+
+### 🏗️ 設計書
+- [プロジェクト設計書](docs/design/project-design.md)
+- [仕様書](docs/design/specification.md)
+- [最適化ロードマップ](docs/design/project-optimization-roadmap.md)
+
+### 📝 開発リソース
+- [開発時の学び](docs/development/development-learnings.md)
+- [User Data変更履歴](docs/development/user-data-changes.md)
+- [コンソール色設定ガイド](docs/development/console-color-guide.md)
+
+### ✅ チェックリスト
+- [CDKベストプラクティス](docs/checklists/cdk-best-practices-checklist.md)
+
+### 📋 計画書
+- [移行計画書](docs/planning/migration-plan.md)
 
 ## ⚡ 特徴
 

@@ -47,7 +47,7 @@ echo "📋 削除するスタック:"
 echo "  アカウント: $CDK_ACCOUNT"
 echo "  リージョン: ${CDK_REGION:-ap-northeast-1}"
 echo "  環境: $CDK_ENV"
-echo "  スタック名: Web3CdkStack-$ENV"
+echo "  スタック群: web3cdk-$ENV-* (全スタック)"
 
 # プロダクション環境の場合は特別な確認
 if [ "$ENV" = "prod" ]; then
@@ -72,7 +72,7 @@ fi
 # スタックの削除
 echo ""
 echo "🗑️  スタックを削除しています..."
-npx cdk destroy --force
+npx cdk destroy --all --force
 
 echo ""
 echo "✅ スタックが正常に削除されました！"

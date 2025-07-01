@@ -41,3 +41,7 @@ npm-debug.log*
 
 # Test directory (will be recreated in Phase 5)
 test/
+
+# Backup files (exclude README.md)
+backup/*
+!backup/README.md

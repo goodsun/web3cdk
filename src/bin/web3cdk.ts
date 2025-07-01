@@ -4,6 +4,8 @@ import * as cdk from 'aws-cdk-lib';
 import { Web3CdkStorageStack } from '../lib/web3cdk-stack';
 import { Web3CdkNetworkStack } from '../lib/web3cdk-network-stack';
 import { Web3CdkEc2Stack } from '../lib/web3cdk-ec2-stack';
+import { CacheApiStack } from '../../lib/stacks/cache-api-stack';
+import { BotApiStack } from '../../lib/stacks/bot-api-stack';
 
 /**
  * CDKアプリケーションのエントリーポイント
@@ -67,8 +69,24 @@ try {
     description: `${projectName} - ストレージ (${environment}環境)`,
   });
 
+  // Phase 3: Cache API スタックの作成（独立）
+  const cacheApiStack = new CacheApiStack(app, `${projectName}-${environment}-cache-api`, {
+    ...baseProps,
+    description: `${projectName} - Cache API (${environment}環境)`,
+  });
+
+  // Phase 4: Bot API スタックの作成（独立）
+  const botApiStack = new BotApiStack(app, `${projectName}-${environment}-bot-api`, {
+    ...baseProps,
+    projectName,
+    description: `${projectName} - Bot API (${environment}環境)`,
+  });
+
   // スタック間の依存関係を明示的に設定
   ec2Stack.addDependency(networkStack);
+  
+  // EC2スタックがAPIスタックのURL出力を参照するため依存関係を設定
+  // 注意: ImportValueを使用しているため、APIスタックが先にデプロイされている必要がある
 
   console.log(`✅ CDK app initialized successfully for ${environment} environment`);
 

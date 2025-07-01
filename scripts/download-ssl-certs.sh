@@ -78,7 +78,7 @@ echo "インスタンスID: $INSTANCE_ID"
 echo "インスタンスIP: $INSTANCE_IP"
 
 # ローカルの保存ディレクトリ作成
-LOCAL_SSL_DIR="ssl-backup/${ENVIRONMENT}/${DOMAIN}/$(date +%Y%m%d_%H%M%S)"
+LOCAL_SSL_DIR="backup/ssl/${ENVIRONMENT}/${DOMAIN}/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$LOCAL_SSL_DIR"
 
 echo "📁 保存先: $LOCAL_SSL_DIR"
@@ -147,6 +147,35 @@ if ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no \
     echo "✅ archive証明書ファイルのダウンロード完了"
 else
     echo "⚠️  archive証明書ファイルのコピーに失敗しました"
+fi
+
+# Apache設定ファイルもバックアップ
+echo "💾 Apache設定ファイルをダウンロード中..."
+APACHE_BACKUP_DIR="$LOCAL_SSL_DIR/apache-config"
+mkdir -p "$APACHE_BACKUP_DIR"
+
+# Apache VirtualHost設定ファイルのバックアップ
+ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no \
+    ec2-user@"$INSTANCE_IP" "
+    sudo mkdir -p '$TEMP_DIR/apache'
+    # VirtualHost設定ファイル
+    sudo cp '/etc/httpd/conf.d/$DOMAIN.conf' '$TEMP_DIR/apache/' 2>/dev/null || true
+    sudo cp '/etc/httpd/conf.d/$DOMAIN-le-ssl.conf' '$TEMP_DIR/apache/' 2>/dev/null || true
+    # SSL設定ファイル
+    sudo cp '/etc/httpd/conf.d/ssl.conf' '$TEMP_DIR/apache/' 2>/dev/null || true
+    # Let's Encrypt renewal設定
+    sudo cp '/etc/letsencrypt/renewal/$DOMAIN.conf' '$TEMP_DIR/apache/' 2>/dev/null || true
+    sudo chown -R ec2-user:ec2-user '$TEMP_DIR/apache'
+    "
+
+# Apache設定ファイルのダウンロード
+if ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no \
+    ec2-user@"$INSTANCE_IP" "test -n \"\$(ls '$TEMP_DIR/apache'/*.conf 2>/dev/null)\""; then
+    scp -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no \
+        ec2-user@"$INSTANCE_IP":"$TEMP_DIR/apache"/*.conf "$APACHE_BACKUP_DIR/" 2>/dev/null || true
+    echo "✅ Apache設定ファイルのダウンロード完了"
+else
+    echo "⚠️  Apache設定ファイルが見つかりませんでした"
 fi
 
 # サーバー上の一時ファイル削除

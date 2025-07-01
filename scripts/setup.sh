@@ -4,8 +4,38 @@
 
 set -e  # エラーが発生したら即座に停止
 
-echo "🚀 Web3 CDK セットアップスクリプト"
+# 引数から環境名を取得
+ENV_ARG=${1:-"dev"}  # デフォルトはdev
+
+echo "🚀 Web3 CDK セットアップスクリプト (${ENV_ARG}環境)"
 echo "================================="
+
+# 0. 既存の.envファイルチェック
+ENV_FILE=".env.${ENV_ARG}"
+if [ -f "$ENV_FILE" ]; then
+    echo ""
+    echo "⚠️  既存の設定ファイルが見つかりました: $ENV_FILE"
+    echo ""
+    echo "📋 現在の設定内容:"
+    echo "----------------------------------------"
+    grep -E "^(CDK_ACCOUNT|CDK_REGION|CDK_ENV|PROJECT_NAME|ORG_NAME)" "$ENV_FILE" 2>/dev/null || echo "設定が見つかりません"
+    echo "----------------------------------------"
+    echo ""
+    echo "⚠️  継続すると既存の設定が上書きされる可能性があります"
+    echo ""
+    read -p "続行しますか？ (y/n): " overwrite_confirm
+    
+    if [ "$overwrite_confirm" != "y" ] && [ "$overwrite_confirm" != "Y" ]; then
+        echo ""
+        echo "❌ ユーザーによってセットアップがキャンセルされました"
+        echo ""
+        echo "💡 既存の設定を確認するには:"
+        echo "   cat $ENV_FILE"
+        echo ""
+        exit 0
+    fi
+    echo "✅ 既存設定を上書きして続行します"
+fi
 
 # 1. AWS CLIの確認
 echo ""
@@ -75,7 +105,7 @@ echo "=================="
 # デフォルト値（ディレクトリ名から）
 DEFAULT_PROJECT=$(basename "$PWD")
 DEFAULT_ORG="bonsoleil"
-DEFAULT_ENV="dev"
+DEFAULT_ENV="$ENV_ARG"  # 引数から設定
 
 # ユーザー入力
 echo "プロジェクトの設定を行います:"
@@ -219,10 +249,26 @@ USE_ELASTIC_IP=true
 # ドメイン設定（Phase 4で使用）
 # DOMAIN_NAME=your-domain.com
 # EMAIL=admin@your-domain.com
+
+# Cache API設定
+CACHE_CONTRACT_ADDRESSES=0xBC4CA0EdA7647A8aB7C2061c2E118A18a936f13D
+CACHE_CHAIN_ID=1
+CACHE_RPC_ENDPOINT=https://ethereum-rpc.publicnode.com
+CACHE_ALLOWED_ORIGINS=*
+
+# Bot API設定
+DISCORD_PUBLIC_KEY=your-discord-public-key
+DISCORD_APPLICATION_ID=your-discord-application-id
+BOT_CORS_ORIGIN=*
 EOF
     echo "✅ $ENV_FILE を作成しました"
 else
     echo "ℹ️  $ENV_FILE は既に存在します"
+    echo ""
+    echo -e "\033[31m⚠️  重要: ローカルの秘密鍵ファイルを削除した場合\033[0m"
+    echo -e "\033[31mAWS側のキーペアも手動で削除してください:\033[0m"
+    echo -e "\033[31maws ec2 delete-key-pair --key-name ${PROJECT_NAME}-${CDK_ENV} --region $REGION\033[0m"
+    echo ""
 fi
 
 # 7. EC2キーペアの作成
@@ -233,7 +279,7 @@ echo "7️⃣ EC2キーペアを確認・作成しています..."
 KEY_NAME="${PROJECT_NAME}-${CDK_ENV}"
 
 # キーペアの存在確認
-if aws ec2 describe-key-pairs --key-names "$KEY_NAME" --region "$CDK_REGION" &>/dev/null; then
+if aws ec2 describe-key-pairs --key-names "$KEY_NAME" --region "$REGION" &>/dev/null; then
     echo "✅ キーペア '$KEY_NAME' は既に存在します"
 else
     echo "🔧 キーペア '$KEY_NAME' を作成しています..."
@@ -241,15 +287,30 @@ else
     # ~/.sshディレクトリの作成
     mkdir -p ~/.ssh
     
+    # 既存の秘密鍵ファイルがある場合の警告
+    if [ -f ~/.ssh/"${KEY_NAME}.pem" ]; then
+        echo ""
+        echo -e "\033[31m⚠️  既存の秘密鍵ファイルが見つかりました: ~/.ssh/${KEY_NAME}.pem\033[0m"
+        echo -e "\033[31m新しいキーペアを作成する前に、AWS側のキーペアを手動で削除してください:\033[0m"
+        echo -e "\033[31maws ec2 delete-key-pair --key-name $KEY_NAME --region $REGION\033[0m"
+        echo ""
+        echo -e "\033[33m💡 削除後、このスクリプトを再実行してください\033[0m"
+        exit 1
+    fi
+    
     # キーペアの作成
-    if aws ec2 create-key-pair --key-name "$KEY_NAME" --query 'KeyMaterial' --output text > ~/.ssh/"${KEY_NAME}.pem" 2>/dev/null; then
+    echo "🔧 実行コマンド: aws ec2 create-key-pair --key-name $KEY_NAME --region $REGION"
+    if aws ec2 create-key-pair --key-name "$KEY_NAME" --region "$REGION" --query 'KeyMaterial' --output text > ~/.ssh/"${KEY_NAME}.pem" 2>/tmp/keypair_error.log; then
         # 権限設定
         chmod 400 ~/.ssh/"${KEY_NAME}.pem"
         echo "✅ キーペア '$KEY_NAME' を作成しました"
         echo "📁 秘密鍵の保存場所: ~/.ssh/${KEY_NAME}.pem"
     else
         echo "❌ キーペアの作成に失敗しました"
-        echo "💡 手動で作成してください: aws ec2 create-key-pair --key-name $KEY_NAME"
+        echo "🔍 エラー詳細:"
+        cat /tmp/keypair_error.log
+        echo ""
+        echo "💡 手動で作成してください: aws ec2 create-key-pair --key-name $KEY_NAME --region $REGION"
         exit 1
     fi
 fi

@@ -1,0 +1,23 @@
+{
+  "name": "ca-casher-lambda",
+  "version": "1.0.0",
+  "description": "Lambda functions for CA Casher",
+  "main": "handler.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.632.0",
+    "@aws-sdk/lib-dynamodb": "^3.632.0",
+    "@codegenie/serverless-express": "^4.12.6",
+    "@types/aws-lambda": "^8.10.150",
+    "ethers": "^6.13.2",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.5.5",
+    "typescript": "^5.6.3"
+  }
+}

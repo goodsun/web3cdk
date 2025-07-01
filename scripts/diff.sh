@@ -60,7 +60,7 @@ echo "🔍 CDK差分を確認しています..."
 echo "================================================"
 
 # CDK差分実行と結果保存
-DIFF_OUTPUT=$(npx cdk diff --app "npx ts-node --project tools/tsconfig.json src/bin/web3cdk.ts" 2>&1)
+DIFF_OUTPUT=$(npx cdk diff --all --app "npx ts-node --project tools/tsconfig.json src/bin/web3cdk.ts" 2>&1)
 echo "$DIFF_OUTPUT"
 
 # User Data変更による再作成の警告
