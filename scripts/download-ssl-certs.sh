@@ -3,6 +3,13 @@
 # SSL証明書ダウンロードスクリプト
 # Usage: ./scripts/download-ssl-certs.sh [environment] [domain]
 
+echo ""
+echo -e "\033[93m╔════════════════════════════════════════════════════════════════════════╗\033[0m"
+echo -e "\033[93m║                        🔒 SSL証明書ダウンロード                        ║\033[0m"
+echo -e "\033[93m║                     EC2インスタンスから証明書を取得                    ║\033[0m"
+echo -e "\033[93m╚════════════════════════════════════════════════════════════════════════╝\033[0m"
+echo ""
+
 set -e
 
 # 引数の処理
@@ -44,13 +51,13 @@ STACK_NAME=""
 
 for stack in "${POSSIBLE_STACKS[@]}"; do
     echo "📋 スタック確認: $stack"
-    
+
     INSTANCE_ID=$(aws cloudformation describe-stacks \
         --stack-name "$stack" \
         --query 'Stacks[0].Outputs[?OutputKey==`InstanceId`].OutputValue' \
         --output text \
         --region "$CDK_REGION" 2>/dev/null)
-    
+
     if [[ -n "$INSTANCE_ID" && "$INSTANCE_ID" != "None" ]]; then
         INSTANCE_IP=$(aws cloudformation describe-stacks \
             --stack-name "$stack" \
@@ -114,7 +121,7 @@ if ! ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no \
     ec2-user@"$INSTANCE_IP" "sudo test -d '$REMOTE_SSL_DIR'"; then
     echo "❌ 証明書ディレクトリが見つかりません: $REMOTE_SSL_DIR"
     echo "Let's Encrypt証明書が作成されていない可能性があります"
-    
+
     # 利用可能なドメインを表示
     echo "📋 利用可能なドメイン:"
     ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no \
@@ -186,7 +193,7 @@ ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no \
 LIVE_DIR="/etc/letsencrypt/live/${DOMAIN}"
 if ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no \
     ec2-user@"$INSTANCE_IP" "sudo test -d '$LIVE_DIR'"; then
-    
+
     echo "📂 現在の証明書（live）もダウンロード中..."
     TEMP_LIVE_DIR="/tmp/ssl-live-$(date +%s)"
     ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no \
@@ -195,7 +202,7 @@ if ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no \
         sudo cp -L '$LIVE_DIR'/*.pem '$TEMP_LIVE_DIR'/ 2>/dev/null || true
         sudo chown -R ec2-user:ec2-user '$TEMP_LIVE_DIR'
         "
-    
+
     mkdir -p "$LOCAL_SSL_DIR/live"
     if ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no \
         ec2-user@"$INSTANCE_IP" "test -n \"\$(ls '$TEMP_LIVE_DIR'/*.pem 2>/dev/null)\""; then
@@ -205,7 +212,7 @@ if ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no \
     else
         echo "⚠️  live証明書ファイルのコピーに失敗しました"
     fi
-    
+
     ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no \
         ec2-user@"$INSTANCE_IP" "rm -rf '$TEMP_LIVE_DIR'"
 fi

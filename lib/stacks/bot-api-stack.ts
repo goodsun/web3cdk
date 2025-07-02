@@ -36,6 +36,55 @@ export class BotApiStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY, // 開発環境用
     });
 
+    // 追加のDynamoDBテーブル
+    const wantRequestTable = new dynamodb.Table(this, 'WantRequestTable', {
+      tableName: `${props.projectName}-${props.environment}-want-requests`,
+      partitionKey: {
+        name: 'id',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecovery: true,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const conversationTable = new dynamodb.Table(this, 'ConversationTable', {
+      tableName: `${props.projectName}-${props.environment}-conversations`,
+      partitionKey: {
+        name: 'id',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecovery: true,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const discordEOATable = new dynamodb.Table(this, 'DiscordEOATable', {
+      tableName: `${props.projectName}-${props.environment}-discord-eoa`,
+      partitionKey: {
+        name: 'discord_id',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecovery: true,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const registrationTokenTable = new dynamodb.Table(this, 'RegistrationTokenTable', {
+      tableName: `${props.projectName}-${props.environment}-registration-tokens`,
+      partitionKey: {
+        name: 'token',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecovery: true,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     // Lambda関数作成
     this.lambdaFunction = new lambda.Function(this, 'BotApiFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
@@ -45,8 +94,15 @@ export class BotApiStack extends cdk.Stack {
       memorySize: 512,
       environment: {
         TABLE_NAME: this.table.tableName,
+        WANT_REQUEST_TABLE_NAME: wantRequestTable.tableName,
+        CONVERSATION_TABLE_NAME: conversationTable.tableName,
+        DISCORD_EOA_TABLE_NAME: discordEOATable.tableName,
+        REGISTRATION_TOKEN_TABLE_NAME: registrationTokenTable.tableName,
         DISCORD_PUBLIC_KEY: process.env.DISCORD_PUBLIC_KEY || '',
-        DISCORD_APPLICATION_ID: process.env.DISCORD_APPLICATION_ID || '',
+        DISCORD_APPLICATION_ID: process.env.DISCORD_APP_ID || '',
+        DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN || '',
+        DISCORD_GUILD_ID: process.env.DISCORD_GUILD_ID || '',
+        API_BASE_URL: process.env.API_BASE_URL || `https://${process.env.DOMAIN_NAME}/api/bot`,
         CORS_ORIGIN: process.env.BOT_CORS_ORIGIN || '*',
       },
       description: 'Discord Bot API Lambda Function',
@@ -54,6 +110,10 @@ export class BotApiStack extends cdk.Stack {
 
     // Lambda関数にDynamoDBアクセス権限を付与
     this.table.grantReadWriteData(this.lambdaFunction);
+    wantRequestTable.grantReadWriteData(this.lambdaFunction);
+    conversationTable.grantReadWriteData(this.lambdaFunction);
+    discordEOATable.grantReadWriteData(this.lambdaFunction);
+    registrationTokenTable.grantReadWriteData(this.lambdaFunction);
 
     // API Gateway作成
     this.api = new apigateway.RestApi(this, 'BotApi', {

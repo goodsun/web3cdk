@@ -49,8 +49,9 @@
 - **インストール済みソフトウェア**:
   - Geth 1.11.6
   - Node.js (最新安定版)
-  - Apache httpd
-  - npm
+  - Apache httpd + mod_ssl
+  - python3-certbot-apache（Let's Encrypt SSL証明書用）
+  - 開発ツール: tmux, htop, tree, vim, jq, net-tools, nmap-ncat, bind-utils
 
 ### セキュリティグループ
 | ポート | プロトコル | 用途 | デフォルト設定 |
@@ -87,24 +88,35 @@
     "constantinopleBlock": 0,
     "petersburgBlock": 0,
     "istanbulBlock": 0,
+    "berlinBlock": 0,
+    "londonBlock": 0,
     "clique": {
       "period": 0,
       "epoch": 30000
     }
   },
   "alloc": {
-    "0x...": {
+    "0x59d2e0E4DCf3Dc47e83364D4E9A91b310e713248": {
       "balance": "500000000000000000000000"
     }
   },
   "difficulty": "0x1",
-  "gasLimit": "0x632EA0"
+  "extraData": "0x000000000000000000000000000000000000000000000000000000000000000059d2e0E4DCf3Dc47e83364D4E9A91b310e7132480000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "gasLimit": "0x632EA0",
+  "nonce": "0x0000000000000042",
+  "mixhash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "timestamp": "0x00"
 }
 ```
 
+**重要なポイント:**
+- `extraData`: Clique PoAの署名者アドレスを含む（32バイト0 + 20バイトアドレス + 65バイト0）
+- `alloc`: 初期残高を設定するアカウント
+
 ### Geth起動オプション
 ```bash
-geth --datadir /var/lib/geth \
+geth --datadir /opt/geth/data \
      --networkid 21201 \
      --http --http.addr 0.0.0.0 --http.port 8545 \
      --http.corsdomain "*" \
@@ -113,8 +125,41 @@ geth --datadir /var/lib/geth \
      --ws.origins "*" \
      --allow-insecure-unlock \
      --mine --miner.threads=1 \
+     --miner.etherbase 0x59d2e0E4DCf3Dc47e83364D4E9A91b310e713248 \
      --nodiscover
 ```
+
+**重要な設定項目:**
+- `--miner.etherbase`: マイニング報酬の受取先アドレス（**必須**）
+- `--mine --miner.threads=1`: マイニングを有効化
+- `--nodiscover`: ピア検出を無効化（プライベートチェーン用）
+
+### Geth自動起動設定
+Gethはsystemdサービスとして自動起動するよう設定されます：
+
+```ini
+[Unit]
+Description=Geth Ethereum Node
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/opt/geth
+ExecStart=/usr/local/bin/geth --datadir data --networkid 21201 --http --http.addr 0.0.0.0 --http.port 8545 --http.corsdomain "*" --http.api eth,net,web3,personal,miner --ws --ws.addr 0.0.0.0 --ws.port 8546 --ws.api eth,net,web3,personal,miner --ws.origins "*" --allow-insecure-unlock --mine --miner.threads 1 --miner.etherbase 0x59d2e0E4DCf3Dc47e83364D4E9A91b310e713248 --nodiscover
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+```
+
+- **自動起動**: システム起動時に自動でGethが開始
+- **自動復旧**: プロセス異常終了時に10秒後に再起動
+- **ログ出力**: journaldでログ管理（`journalctl -u geth`で確認可能）
 
 ## セキュリティ設定
 
@@ -236,15 +281,27 @@ sudo systemctl start geth
 ### よくある問題と解決方法
 
 #### 1. Gethが起動しない
+
 ```bash
+# エラーログ確認
+sudo journalctl -u geth --no-pager | tail -10
+
 # サービスステータス確認
 sudo systemctl status geth
+```
 
-# 設定ファイル確認
-sudo cat /etc/systemd/system/geth.service
+**よくあるエラーと解決方法:**
 
-# 手動起動でエラー確認
-sudo -u geth /usr/local/bin/geth --datadir /var/lib/geth
+| エラーメッセージ | 原因 | 解決方法 |
+|------------------|------|----------|
+| "etherbase must be explicitly specified" | `--miner.etherbase`オプション未設定 | systemdサービスファイルにetherbaseを追加 |
+| "can't start clique chain without signers" | genesis.jsonのextraDataが空 | extraDataに署名者アドレスを設定 |
+| "Fatal: Failed to write genesis block" | genesis.jsonの形式エラー | genesis.jsonの構文を確認 |
+
+**手動デバッグ:**
+```bash
+# 手動起動でエラー詳細確認
+sudo -u ec2-user /usr/local/bin/geth --datadir /opt/geth/data --networkid 21201
 ```
 
 #### 2. キーストアインポートエラー
@@ -265,10 +322,29 @@ sudo netstat -tlnp | grep 8545
 sudo iptables -L -n
 ```
 
-#### 4. EC2インスタンスにSSH接続できない
+#### 4. SSL証明書の問題
+
+**症状**: HTTPS接続できない、certbotコマンドが見つからない
+
+```bash
+# certbotインストール状況確認
+which certbot-3
+ls -la /usr/bin/certbot*
+
+# Amazon Linux 2023での正しい方法
+sudo dnf install -y python3-certbot-apache
+
+# 手動でSSL証明書取得
+sudo /usr/bin/certbot-3 --apache -d your-domain.com --email your-email@example.com --agree-tos --non-interactive --redirect
+```
+
+**重要**: Amazon Linux 2023では実行ファイルは`/usr/bin/certbot-3`
+
+#### 5. EC2インスタンスにSSH接続できない
 - セキュリティグループの設定確認
-- キーペアの確認
+- キーペアの確認（EC2_KEY_NAME環境変数の設定確認）
 - インスタンスのパブリックIP確認
+- ElasticIPの関連付け確認
 
 ### パフォーマンスチューニング
 
@@ -306,3 +382,8 @@ CloudWatchメトリクスの推奨設定：
 - Amazon Linux 2023対応
 - Node.js/Apache httpd追加
 - SSH接続機能追加
+- 2025-07-03: 実装時の問題対応を追加
+  - Geth etherbase設定の必須化（--miner.etherbase）
+  - Clique PoA のsigner設定（extraData）
+  - Amazon Linux 2023でのcertbot正しいインストール方法（/usr/bin/certbot-3）
+  - トラブルシューティング強化

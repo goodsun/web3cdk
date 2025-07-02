@@ -67,17 +67,22 @@ export class NetworkStack extends cdk.Stack {
       'Allow SSH access from admin'
     );
 
-    // Geth RPC/WebSocket用ポート - VPC内部のみ
+    // Geth RPC/WebSocket用ポート - 仕様書通り（要セキュリティ制限）
+    const gethCidr = process.env.GETH_CIDR || '0.0.0.0/0';
+    if (gethCidr === '0.0.0.0/0') {
+      console.warn('⚠️ WARNING: Geth RPC/WS access is open to all IPs. Set GETH_CIDR environment variable for security.');
+    }
+    
     this.securityGroup.addIngressRule(
-      ec2.Peer.ipv4('10.0.0.0/16'),
+      ec2.Peer.ipv4(gethCidr),
       ec2.Port.tcp(8545),
-      'Allow Geth RPC access from VPC'
+      'Allow Geth RPC access'
     );
 
     this.securityGroup.addIngressRule(
-      ec2.Peer.ipv4('10.0.0.0/16'),
+      ec2.Peer.ipv4(gethCidr),
       ec2.Port.tcp(8546),
-      'Allow Geth WebSocket access from VPC'
+      'Allow Geth WebSocket access'
     );
 
     // Application Load Balancer経由でのGethアクセス用

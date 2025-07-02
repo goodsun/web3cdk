@@ -2,20 +2,40 @@
 
 # CDKデプロイスクリプト - シンプルで確実なデプロイ
 
+echo ""
+echo -e "\033[34m╔═══════════════════════════════════════════════════════════════════════════╗\033[0m"
+echo -e "\033[34m║                           🚀 CDK デプロイ                                 ║\033[0m"
+echo -e "\033[34m║                     インフラストラクチャを AWS にデプロイ                 ║\033[0m"
+echo -e "\033[34m╚═══════════════════════════════════════════════════════════════════════════╝\033[0m"
+echo ""
+
 set -e  # エラーが発生したら即座に停止
 
 # 使い方の表示
 if [ $# -eq 0 ]; then
-    echo "使い方: $0 <環境>"
+    echo "使い方: $0 <環境> [--stacks <スタック名>]"
     echo "  環境: dev, stg, または prod"
     echo ""
     echo "例:"
-    echo "  $0 dev    # 開発環境にデプロイ"
-    echo "  $0 prod   # 本番環境にデプロイ"
+    echo "  $0 dev                              # 開発環境に全スタックデプロイ"
+    echo "  $0 dev --stacks web3cdk-dev-ec2     # EC2スタックのみデプロイ"
+    echo "  $0 prod                             # 本番環境にデプロイ"
     exit 1
 fi
 
 ENV=$1
+shift
+
+# --stacksオプションの処理
+STACKS_OPTION=""
+if [ "$1" = "--stacks" ]; then
+    if [ -z "$2" ]; then
+        echo "❌ --stacksオプションにはスタック名を指定してください"
+        exit 1
+    fi
+    STACKS_OPTION="$2"
+    shift 2
+fi
 echo "🚀 $ENV 環境にデプロイします"
 echo "========================"
 
@@ -81,52 +101,20 @@ fi
 
 echo "✅ 必須環境変数チェック完了"
 
-echo "📋 デプロイ設定:"
-echo "  アカウント: $CDK_ACCOUNT"
-echo "  リージョン: ${CDK_REGION:-ap-northeast-1}"
-echo "  環境: $CDK_ENV"
-
-# EC2ミニマルリセットモードの警告
-if [ "$EC2_MINIMAL_RESET" = "true" ]; then
-    echo ""
-    echo -e "\033[1;31m⚠️  EC2ミニマルリセットモード（2段階方式）\033[0m"
-    echo -e "\033[1;31m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
-    echo ""
-    echo -e "\033[1;33m📋 動作説明:\033[0m"
-    echo "1. 最小限のEC2インスタンスを作成します（SSL証明書なし）"
-    echo "2. 次回の通常デプロイで完全な構成に自動置き換えされます"
-    echo ""
-    echo -e "\033[1;32m✅ この方式のメリット:\033[0m"
-    echo "- Let's Encrypt証明書を消費しない"
-    echo "- 連続再作成の問題を回避"
-    echo "- 安全で確実な再作成"
-    echo ""
-    echo -e "\033[1;33m🔧 事前に必要な作業:\033[0m"
-    echo ""
-    echo "1. SSL証明書のバックアップ（念のため）"
-    echo -e "   \033[36m./scripts/download-ssl-certs.sh $ENV\033[0m"
-    echo ""
-    echo "2. 既存SSHキーペアの削除"
-    echo -e "   \033[36maws ec2 delete-key-pair --key-name $EC2_KEY_NAME --region ${CDK_REGION:-ap-northeast-1}\033[0m"
-    echo ""
-    echo "3. ローカル秘密鍵の削除"
-    echo -e "   \033[36mrm ~/.ssh/$EC2_KEY_NAME.pem\033[0m"
-    echo ""
-    echo -e "\033[1;36m📌 次のステップ:\033[0m"
-    echo "このデプロイ完了後、EC2_MINIMAL_RESETを外して再度デプロイしてください："
-    echo -e "\033[36mnpm run deploy:$ENV\033[0m"
-    echo ""
-    read -p "準備は完了していますか？ (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo ""
-        echo "デプロイを中止しました。"
-        echo "上記の準備を完了してから再度実行してください。"
-        exit 1
-    fi
-    echo ""
-    echo "✅ ミニマルEC2インスタンスを作成します..."
+if [ -n "$STACKS_OPTION" ]; then
+    echo "📋 デプロイ設定:"
+    echo "  アカウント: $CDK_ACCOUNT"
+    echo "  リージョン: ${CDK_REGION:-ap-northeast-1}"
+    echo "  環境: $CDK_ENV"
+    echo "  対象スタック: $STACKS_OPTION"
+else
+    echo "📋 デプロイ設定:"
+    echo "  アカウント: $CDK_ACCOUNT"
+    echo "  リージョン: ${CDK_REGION:-ap-northeast-1}"
+    echo "  環境: $CDK_ENV"
+    echo "  デプロイ方式: 全スタック一括"
 fi
+
 
 # プロダクション環境の場合は確認
 if [ "$ENV" = "prod" ]; then
@@ -165,13 +153,18 @@ fi
 
 # デプロイの実行
 echo ""
-echo -e "\033[1;33m🚀 スタックをデプロイしています（全スタック一括）...\033[0m"
-echo -e "\033[34m💡 上級者向けTips: 個別デプロイも可能です\033[0m"
-echo -e "\033[35m   npx cdk deploy web3cdk-$ENV-network    # ネットワークのみ\033[0m"
-echo -e "\033[35m   npx cdk deploy web3cdk-$ENV-ec2        # EC2のみ\033[0m"  
-echo -e "\033[35m   npx cdk deploy web3cdk-$ENV-storage    # ストレージのみ\033[0m"
-echo ""
-npx cdk deploy --all --require-approval never
+if [ -n "$STACKS_OPTION" ]; then
+    echo -e "\033[1;33m🚀 指定されたスタックをデプロイしています: $STACKS_OPTION\033[0m"
+    npx cdk deploy "$STACKS_OPTION" --require-approval never
+else
+    echo -e "\033[1;33m🚀 スタックをデプロイしています（全スタック一括）...\033[0m"
+    echo -e "\033[34m💡 上級者向けTips: 個別デプロイも可能です\033[0m"
+    echo -e "\033[35m   npx cdk deploy web3cdk-$ENV-network    # ネットワークのみ\033[0m"
+    echo -e "\033[35m   npx cdk deploy web3cdk-$ENV-ec2        # EC2のみ\033[0m"
+    echo -e "\033[35m   npx cdk deploy web3cdk-$ENV-storage    # ストレージのみ\033[0m"
+    echo ""
+    npx cdk deploy --all --require-approval never
+fi
 
 # 結果の表示
 echo ""

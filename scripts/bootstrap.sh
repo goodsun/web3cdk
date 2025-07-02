@@ -1,11 +1,16 @@
 #!/bin/bash
 
 # CDKブートストラップスクリプト - アカウント・リージョンに1回だけ実行
+# 既存スタックがある場合は安全に更新されます（削除・再作成ではなく差分更新）
+
+echo ""
+echo -e "\033[36m╔══════════════════════════════════════════════════════════════════════════════╗\033[0m"
+echo -e "\033[36m║                        🏗️  CDK ブートストラップ                              ║\033[0m"
+echo -e "\033[36m║                   AWS環境にCDK実行基盤を構築します                           ║\033[0m"
+echo -e "\033[36m╚══════════════════════════════════════════════════════════════════════════════╝\033[0m"
+echo ""
 
 set -e  # エラーが発生したら即座に停止
-
-echo "🚀 CDKブートストラップスクリプト"
-echo "=============================="
 
 # 1. AWS CLIの確認
 echo ""
@@ -78,6 +83,12 @@ if aws cloudformation describe-stacks --stack-name $BOOTSTRAP_STACK --region $RE
     echo ""
     echo "📋 ブートストラップ情報:"
     aws cloudformation describe-stacks --stack-name $BOOTSTRAP_STACK --region $REGION --query 'Stacks[0].{StackName:StackName,Status:StackStatus,Created:CreationTime}' --output table
+    echo ""
+    echo ""
+    echo "💡 再実行時の動作："
+    echo "   ✅ 既存リソースは削除されません（差分更新のみ）"
+    echo "   ✅ デプロイ済みスタックへの影響はありません"
+    echo "   ✅ CDKの最新機能・権限設定に更新されます"
     echo ""
     read -p "🤔 ブートストラップを再実行して更新しますか？ (y/n): " update_confirm
     if [ "$update_confirm" != "y" ] && [ "$update_confirm" != "Y" ]; then

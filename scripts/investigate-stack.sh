@@ -2,12 +2,17 @@
 
 # 孤立スタック調査ツール - CDKブートストラップ削除後のスタック調査用
 
+echo ""
+echo -e "\033[90m╔════════════════════════════════════════════════════════════════════════╗\033[0m"
+echo -e "\033[90m║                        🔍 スタック詳細調査                                ║\033[0m"
+echo -e "\033[90m║                    孤立スタックの状況を詳細に分析                           ║\033[0m"
+echo -e "\033[90m╚════════════════════════════════════════════════════════════════════════╝\033[0m"
+echo ""
+
 set -e
 
 # 使い方の表示
 if [ $# -eq 0 ]; then
-    echo "🕵️ 孤立スタック調査ツール"
-    echo "========================"
     echo ""
     echo "使い方:"
     echo "  $0 <stack-name>"
@@ -116,7 +121,7 @@ case $choice in
         read -p "削除を実行するには 'delete $STACK_NAME' と入力してください: " confirm
         if [ "$confirm" = "delete $STACK_NAME" ]; then
             echo "🗑️  $STACK_NAME を削除しています..."
-            
+
             # 管理者権限で削除を試行
             if aws cloudformation delete-stack \
                 --stack-name "$STACK_NAME" \
@@ -136,7 +141,7 @@ case $choice in
                 echo ""
                 echo "🔧 解決策: ロールを指定せずに削除を実行します:"
                 echo ""
-                
+
                 # CLI実行方法の提示
                 echo "【削除方法】以下のコマンドを直接実行してください:"
                 echo ""
@@ -148,7 +153,7 @@ case $choice in
                 echo "- cloudformation:DeleteStack"
                 echo "- スタック内のリソースを削除する権限 (S3, Lambda, IAM等)"
                 echo ""
-                
+
                 # それでも失敗する場合の対処法
                 echo "【それでも削除できない場合】"
                 echo ""
@@ -182,7 +187,7 @@ case $choice in
                 echo "現在の認証情報とポリシーを確認:"
                 echo "aws sts get-caller-identity"
                 echo "aws iam get-user-policy --user-name YOUR_USER_NAME --policy-name YOUR_POLICY_NAME"
-                
+
                 echo ""
                 echo "📋 削除状況確認:"
                 echo "aws cloudformation wait stack-delete-complete --stack-name '$STACK_NAME' --region '$CDK_REGION'"

@@ -477,6 +477,8 @@ async function generateRegistrationToken(discordId: string) {
   const token = uuidv4();
   const expiresAt = Math.floor(Date.now() / 1000) + 3600; // 1時間後
 
+  console.log(`Generating token for Discord ID: ${discordId}, table: ${registrationTokenTableName}`);
+  
   const success = await putToDynamoDB(registrationTokenTableName, {
     token,
     discord_id: discordId,
@@ -484,6 +486,8 @@ async function generateRegistrationToken(discordId: string) {
     used: false,
   });
 
+  console.log(`Token generation result: ${success}, token: ${success ? token : 'null'}`);
+  console.log(`Environment check - DISCORD_PUBLIC_KEY: ${discordPublicKey ? 'SET' : 'EMPTY'}`);
   return success ? token : null;
 }
 
@@ -909,7 +913,7 @@ app.post("/discord", async (req: Request, res: Response) => {
           const token = await generateRegistrationToken(userId);
 
           // DM送信
-          const registrationUrl = `${apiBaseUrl}/api/register.html?token=${token}`;
+          const registrationUrl = `${apiBaseUrl}/register.html?token=${token}`;
           const dmMessage = `🔗 **ウォレット登録**\n\n以下のリンクをクリックしてMetaMaskを接続し、署名を完了してください：\n${registrationUrl}\n\n⏰ このリンクは1時間で期限切れになります。`;
 
           const dmSent = await sendDiscordDM(userId, dmMessage);
@@ -1081,7 +1085,7 @@ app.post("/discord", async (req: Request, res: Response) => {
           const requesterName =
             requesterUser?.global_name || requesterUser?.username || "Unknown";
 
-          const transferUrl = `${apiBaseUrl}/api/transfer.html?token=${requestId}&nft_id=${nftId}`;
+          const transferUrl = `${apiBaseUrl}/transfer.html?token=${requestId}&nft_id=${nftId}`;
 
           let dmMessage = `🎯 **NFT譲渡リクエスト**\n\n`;
           dmMessage += `**NFT**: #${nftId}\n`;
@@ -1468,7 +1472,7 @@ app.get("/register.html", (req: Request, res: Response) => {
                 const signature = await signer.signMessage(message);
 
                 // サーバーに送信
-                const response = await fetch('/api/discord/register/verify', {
+                const response = await fetch('/discord/register/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2457,7 +2461,7 @@ app.get("/transfer.html", (req: Request, res: Response) => {
 
             try {
                 // リクエスト情報を取得
-                const response = await fetch(\`/api/discord/transfer/info?token=\${token}\`);
+                const response = await fetch(\`/discord/transfer/info?token=\${token}\`);
                 const result = await response.json();
 
                 if (!result.success) {
@@ -2605,7 +2609,7 @@ app.get("/transfer.html", (req: Request, res: Response) => {
                 document.getElementById('sendDM').disabled = true;
                 document.getElementById('sendDM').textContent = '送信中...';
 
-                const response = await fetch('/api/discord/transfer/dm', {
+                const response = await fetch('/discord/transfer/dm', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2645,7 +2649,7 @@ app.get("/transfer.html", (req: Request, res: Response) => {
                 document.getElementById('confirmReject').disabled = true;
                 document.getElementById('confirmReject').textContent = '処理中...';
 
-                const response = await fetch('/api/discord/transfer/reject', {
+                const response = await fetch('/discord/transfer/reject', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2713,7 +2717,7 @@ app.get("/transfer.html", (req: Request, res: Response) => {
                 const receipt = await tx.wait();
 
                 // サーバーに完了を通知
-                const response = await fetch('/api/discord/transfer/complete', {
+                const response = await fetch('/discord/transfer/complete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

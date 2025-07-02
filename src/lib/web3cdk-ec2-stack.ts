@@ -28,7 +28,6 @@ export class Web3CdkEc2Stack extends cdk.Stack {
       keyName: process.env.EC2_KEY_NAME,
       useElasticIp: process.env.USE_ELASTIC_IP === 'true',
       elasticIpAllocationId: process.env.ELASTIC_IP_ALLOCATION_ID,
-      minimalReset: process.env.EC2_MINIMAL_RESET === 'true',
     });
 
     // タグ設定

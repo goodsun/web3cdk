@@ -7,6 +7,7 @@
     "doc": "docs"
   },
   "scripts": {
+    "help": "./scripts/help.sh",
     "build": "tsc -p tools/tsconfig.json",
     "watch": "tsc -p tools/tsconfig.json -w",
     "test": "jest -c tools/jest.config.js",

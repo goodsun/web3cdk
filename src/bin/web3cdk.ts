@@ -3,7 +3,7 @@ import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import { Web3CdkStorageStack } from '../lib/web3cdk-stack';
 import { Web3CdkNetworkStack } from '../lib/web3cdk-network-stack';
-import { Web3CdkEc2Stack } from '../lib/web3cdk-ec2-stack';
+import { Ec2Stack } from '../../lib/constructs/ec2-stack';
 import { CacheApiStack } from '../../lib/stacks/cache-api-stack';
 import { BotApiStack } from '../../lib/stacks/bot-api-stack';
 
@@ -50,36 +50,39 @@ try {
   const networkStack = new Web3CdkNetworkStack(app, `${projectName}-${environment}-network`, {
     ...baseProps,
     projectName,
-    description: `${projectName} - ネットワーク基盤 (${environment}環境)`,
+    description: `${projectName} - Network Infrastructure (${environment})`,
   });
 
   // Phase 1: EC2スタックの作成（ネットワークに依存）
-  const ec2Stack = new Web3CdkEc2Stack(app, `${projectName}-${environment}-ec2`, {
+  const ec2Stack = new Ec2Stack(app, `${projectName}-${environment}-ec2`, {
     ...baseProps,
     projectName,
-    description: `${projectName} - EC2サーバー (${environment}環境)`,
+    description: `${projectName} - EC2 Server with Geth (${environment})`,
     vpc: networkStack.vpc,
     securityGroup: networkStack.securityGroup,
+    keyName: process.env.EC2_KEY_NAME,
+    useElasticIp: process.env.USE_ELASTIC_IP === 'true',
+    elasticIpAllocationId: process.env.ELASTIC_IP_ALLOCATION_ID,
   });
 
   // Phase 2: ストレージスタックの作成（独立）
   const storageStack = new Web3CdkStorageStack(app, `${projectName}-${environment}-storage`, {
     ...baseProps,
     projectName,
-    description: `${projectName} - ストレージ (${environment}環境)`,
+    description: `${projectName} - Storage Stack (${environment})`,
   });
 
   // Phase 3: Cache API スタックの作成（独立）
   const cacheApiStack = new CacheApiStack(app, `${projectName}-${environment}-cache-api`, {
     ...baseProps,
-    description: `${projectName} - Cache API (${environment}環境)`,
+    description: `${projectName} - Cache API (${environment})`,
   });
 
   // Phase 4: Bot API スタックの作成（独立）
   const botApiStack = new BotApiStack(app, `${projectName}-${environment}-bot-api`, {
     ...baseProps,
     projectName,
-    description: `${projectName} - Bot API (${environment}環境)`,
+    description: `${projectName} - Discord Bot API (${environment})`,
   });
 
   // スタック間の依存関係を明示的に設定

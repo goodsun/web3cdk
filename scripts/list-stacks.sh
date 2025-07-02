@@ -2,10 +2,14 @@
 
 # CDKスタック一覧表示スクリプト - AWSアカウント上のスタック確認
 
-set -e  # エラーが発生したら即座に停止
+echo ""
+echo -e "\033[35m╔══════════════════════════════════════════════════════════════════════════╗\033[0m"
+echo -e "\033[35m║                        📋 CDK スタック一覧表示                           ║\033[0m"
+echo -e "\033[35m║                      AWS上の全スタック状況を確認                         ║\033[0m"
+echo -e "\033[35m╚══════════════════════════════════════════════════════════════════════════╝\033[0m"
+echo ""
 
-echo "📋 CDKスタック一覧表示ツール"
-echo "============================="
+set -e  # エラーが発生したら即座に停止
 
 # 環境変数の読み込み
 ENV_FILE_FOUND=false
@@ -79,7 +83,7 @@ STACKS=$(aws cloudformation list-stacks \
 if [ $? -eq 0 ] && [ ! -z "$STACKS" ]; then
     echo "$STACKS"
     echo ""
-    
+
     # スタック数を表示
     STACK_COUNT=$(aws cloudformation list-stacks \
         --region $REGION \
@@ -104,7 +108,7 @@ BOOTSTRAP_STACK=$(aws cloudformation describe-stacks \
 
 if [ $? -eq 0 ]; then
     echo "$BOOTSTRAP_STACK"
-    
+
     # Bootstrap詳細情報
     echo ""
     echo "📋 Bootstrap詳細:"
@@ -127,7 +131,7 @@ echo ""
 show_project_config_only() {
     echo "🔧 現在のプロジェクト設定:"
     echo "========================="
-    
+
     # 環境設定ファイルの確認と表示
     local config_found=false
     for env_file in .env.local .env.dev .env.stg .env.prod; do
@@ -138,13 +142,13 @@ show_project_config_only() {
             echo ""
         fi
     done
-    
+
     if [ "$config_found" = false ]; then
         echo "⚠️  環境設定ファイルが見つかりません"
         echo "💡 npm run setup を実行して設定を作成してください"
         echo ""
     fi
-    
+
     echo "💡 便利なコマンド:"
     echo "  npm run setup       # 初期セットアップ"
     echo "  npm run bootstrap   # CDKブートストラップ"

@@ -2,6 +2,13 @@
 
 # CDK セットアップスクリプト - シンプルで確実なセットアップ
 
+echo ""
+echo -e "\033[32m╔════════════════════════════════════════════════════════════════════════════╗\033[0m"
+echo -e "\033[32m║                          🚀 Web3 CDK セットアップ                          ║\033[0m"
+echo -e "\033[32m║                      AWS認証・環境設定・プロジェクト初期化                 ║\033[0m"
+echo -e "\033[32m╚════════════════════════════════════════════════════════════════════════════╝\033[0m"
+echo ""
+
 set -e  # エラーが発生したら即座に停止
 
 # 引数から環境名を取得
@@ -14,27 +21,23 @@ echo "================================="
 ENV_FILE=".env.${ENV_ARG}"
 if [ -f "$ENV_FILE" ]; then
     echo ""
-    echo "⚠️  既存の設定ファイルが見つかりました: $ENV_FILE"
+    echo "✅ 既存の設定ファイルが見つかりました: $ENV_FILE"
     echo ""
     echo "📋 現在の設定内容:"
     echo "----------------------------------------"
     grep -E "^(CDK_ACCOUNT|CDK_REGION|CDK_ENV|PROJECT_NAME|ORG_NAME)" "$ENV_FILE" 2>/dev/null || echo "設定が見つかりません"
     echo "----------------------------------------"
     echo ""
-    echo "⚠️  継続すると既存の設定が上書きされる可能性があります"
+    echo "💡 設定変更が必要な場合は、手動で編集してください:"
+    echo "   vi $ENV_FILE"
+    echo "   または"
+    echo "   code $ENV_FILE"
     echo ""
-    read -p "続行しますか？ (y/n): " overwrite_confirm
-    
-    if [ "$overwrite_confirm" != "y" ] && [ "$overwrite_confirm" != "Y" ]; then
-        echo ""
-        echo "❌ ユーザーによってセットアップがキャンセルされました"
-        echo ""
-        echo "💡 既存の設定を確認するには:"
-        echo "   cat $ENV_FILE"
-        echo ""
-        exit 0
-    fi
-    echo "✅ 既存設定を上書きして続行します"
+    echo "🔍 設定確認後、必要に応じて以下を実行:"
+    echo "   npm run bootstrap   # CDKブートストラップ"
+    echo "   npm run deploy:$ENV_ARG  # デプロイ"
+    echo ""
+    exit 0
 fi
 
 # 1. AWS CLIの確認
