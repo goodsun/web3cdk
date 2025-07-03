@@ -57,7 +57,7 @@ export class CacheApiStack extends cdk.Stack {
       restApiName: `web3cdk-cache-api-${environment}`,
       description: 'Smart Contract Cache API',
       deployOptions: {
-        stageName: 'cacheapi',
+        stageName: 'cache',
         throttlingBurstLimit: 20,
         throttlingRateLimit: 10,
         metricsEnabled: true

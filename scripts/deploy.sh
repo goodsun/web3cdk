@@ -13,12 +13,17 @@ set -e  # エラーが発生したら即座に停止
 
 # 使い方の表示
 if [ $# -eq 0 ]; then
-    echo "使い方: $0 <環境> [--stacks <スタック名>]"
+    echo "使い方: $0 <環境> [オプション]"
     echo "  環境: dev, stg, または prod"
+    echo ""
+    echo "オプション:"
+    echo "  --stacks <スタック名>        # 特定スタックのみデプロイ"
+    echo "  --ssl-staging               # SSL証明書をステージング環境で取得"
     echo ""
     echo "例:"
     echo "  $0 dev                              # 開発環境に全スタックデプロイ"
     echo "  $0 dev --stacks web3cdk-dev-ec2     # EC2スタックのみデプロイ"
+    echo "  $0 dev --ssl-staging                # SSL証明書をステージングで取得"
     echo "  $0 prod                             # 本番環境にデプロイ"
     exit 1
 fi
@@ -26,16 +31,30 @@ fi
 ENV=$1
 shift
 
-# --stacksオプションの処理
+# オプションの処理
 STACKS_OPTION=""
-if [ "$1" = "--stacks" ]; then
-    if [ -z "$2" ]; then
-        echo "❌ --stacksオプションにはスタック名を指定してください"
-        exit 1
-    fi
-    STACKS_OPTION="$2"
-    shift 2
-fi
+SSL_STAGING=""
+
+while [ $# -gt 0 ]; do
+    case $1 in
+        --stacks)
+            if [ -z "$2" ]; then
+                echo "❌ --stacksオプションにはスタック名を指定してください"
+                exit 1
+            fi
+            STACKS_OPTION="$2"
+            shift 2
+            ;;
+        --ssl-staging)
+            SSL_STAGING="true"
+            shift
+            ;;
+        *)
+            echo "❌ 不明なオプション: $1"
+            exit 1
+            ;;
+    esac
+done
 echo "🚀 $ENV 環境にデプロイします"
 echo "========================"
 
@@ -63,6 +82,12 @@ export $(grep -v '^#' "$ENV_FILE" | sed 's/#.*//' | grep '=' | xargs)
 
 # 環境変数の設定
 export CDK_ENV=$ENV
+
+# SSL stagingフラグの設定
+if [ "$SSL_STAGING" = "true" ]; then
+    export CERTBOT_STAGING=true
+    echo "🔧 SSL証明書をステージング環境で取得します"
+fi
 
 # 必須環境変数のチェック
 echo ""
@@ -131,6 +156,18 @@ fi
 echo ""
 echo "🔨 TypeScriptをビルドしています..."
 npm run build
+
+# Lambda関数のビルド
+echo "🔨 Lambda関数をビルドしています..."
+if [ -d "lambda/bot-api" ]; then
+    echo "  - bot-api Lambda function"
+    cd lambda/bot-api && npm run build && cd ../..
+fi
+
+if [ -d "lambda/cache-api" ]; then
+    echo "  - cache-api Lambda function"
+    cd lambda/cache-api && npm run build && cd ../..
+fi
 
 # CDK差分の確認
 echo ""

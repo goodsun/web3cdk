@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import { Web3CdkStorageStack } from '../lib/web3cdk-stack';
 import { Web3CdkNetworkStack } from '../lib/web3cdk-network-stack';
 import { Ec2Stack } from '../../lib/constructs/ec2-stack';

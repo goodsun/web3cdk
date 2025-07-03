@@ -102,6 +102,7 @@ export class BotApiStack extends cdk.Stack {
         DISCORD_APPLICATION_ID: process.env.DISCORD_APP_ID || '',
         DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN || '',
         DISCORD_GUILD_ID: process.env.DISCORD_GUILD_ID || '',
+        DISCORD_TEST_MODE: process.env.DISCORD_TEST_MODE || 'false',
         API_BASE_URL: process.env.API_BASE_URL || `https://${process.env.DOMAIN_NAME}/api/bot`,
         CORS_ORIGIN: process.env.BOT_CORS_ORIGIN || '*',
       },
@@ -125,7 +126,7 @@ export class BotApiStack extends cdk.Stack {
         allowHeaders: ['Content-Type', 'X-Amz-Date', 'Authorization', 'X-Api-Key'],
       },
       deployOptions: {
-        stageName: 'botapi',
+        stageName: 'bot',
         throttlingBurstLimit: 50,
         throttlingRateLimit: 20,
       },
@@ -163,6 +164,15 @@ export class BotApiStack extends cdk.Stack {
     const membercardResource = discordResource.addResource('membercard');
     const membercardByIdResource = membercardResource.addResource('{discordId}');
     membercardByIdResource.addMethod('GET', lambdaIntegration);
+    
+    // Discord register/verify endpoints for testing
+    const registerResource = discordResource.addResource('register');
+    const verifyResource = registerResource.addResource('verify');
+    verifyResource.addMethod('POST', lambdaIntegration);
+    
+    // Proxy all other requests
+    const proxyResource = this.api.root.addResource('{proxy+}');
+    proxyResource.addMethod('ANY', lambdaIntegration);
 
     // タグ設定
     cdk.Tags.of(this).add('Project', props.projectName);
@@ -177,7 +187,7 @@ export class BotApiStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, 'BotApiEndpoint', {
-      value: `${this.api.url}botapi/`,
+      value: this.api.url,
       description: 'Bot API Endpoint URL',
     });
 

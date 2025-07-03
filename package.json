@@ -19,6 +19,7 @@
     "diff:stg": "./scripts/diff.sh stg",
     "diff:prod": "./scripts/diff.sh prod",
     "deploy:dev": "./scripts/deploy.sh dev",
+    "deploy:dev:ssl-staging": "./scripts/deploy.sh dev --ssl-staging",
     "deploy:stg": "./scripts/deploy.sh stg",
     "deploy:prod": "./scripts/deploy.sh prod",
     "destroy:dev": "./scripts/destroy.sh dev",

@@ -160,7 +160,7 @@ EOF`,
         `SERVER_IP=$(curl -s https://api.ipify.org)`,
         `DNS_IP=$(dig +short ${domainName} | tail -n1)`,
         `if [ "$SERVER_IP" = "$DNS_IP" ]; then
-          /usr/bin/certbot-3 --apache -d ${domainName} --email ${email} --agree-tos --non-interactive --redirect
+          /usr/bin/certbot-3 --apache -d ${domainName} --email ${email} --agree-tos --non-interactive ${process.env.CERTBOT_STAGING === 'true' ? '--staging' : ''} --redirect
           if [ -f "/etc/httpd/conf.d/${domainName}-le-ssl.conf" ]; then
             sed -i '/<VirtualHost.*:443>/a\\
 \\
@@ -177,12 +177,12 @@ EOF`,
 \\
     # リバースプロキシ設定例（手動で設定してください）\\
     # Bot API プロキシ\\
-    # ProxyPass /api/bot/ https://[API_ID].execute-api.ap-northeast-1.amazonaws.com/botapi/\\
-    # ProxyPassReverse /api/bot/ https://[API_ID].execute-api.ap-northeast-1.amazonaws.com/botapi/\\
+    # ProxyPass /api/bot/ https://[API_ID].execute-api.ap-northeast-1.amazonaws.com/bot/\\
+    # ProxyPassReverse /api/bot/ https://[API_ID].execute-api.ap-northeast-1.amazonaws.com/bot/\\
 \\
     # Cache API プロキシ\\
-    # ProxyPass /api/cache/ https://[API_ID].execute-api.ap-northeast-1.amazonaws.com/cacheapi/\\
-    # ProxyPassReverse /api/cache/ https://[API_ID].execute-api.ap-northeast-1.amazonaws.com/cacheapi/\\
+    # ProxyPass /api/cache/ https://[API_ID].execute-api.ap-northeast-1.amazonaws.com/cache/\\
+    # ProxyPassReverse /api/cache/ https://[API_ID].execute-api.ap-northeast-1.amazonaws.com/cache/\\
 \\
     # Geth RPC プロキシ（ローカル）\\
     ProxyPass /rpc http://localhost:8545\\
@@ -201,8 +201,8 @@ EOF`,
         "# リバースプロキシ設定方法",
         `echo "========================================="`,
         `echo "リバースプロキシを設定するには:"`,
-        `echo "1. Bot API URL: aws cloudformation describe-stacks --stack-name web3cdk-${props.environment}-bot-api --query 'Stacks[0].Outputs[?OutputKey==\\`BotApiUrl\\`].OutputValue' --output text"`,
-        `echo "2. Cache API URL: aws cloudformation describe-stacks --stack-name web3cdk-${props.environment}-cache-api --query 'Stacks[0].Outputs[?OutputKey==\\`CacheApiEndpoint\\`].OutputValue' --output text"`,
+        `echo "1. Bot API URL: aws cloudformation describe-stacks --stack-name web3cdk-${props.environment}-bot-api --query 'Stacks[0].Outputs[?OutputKey==\\"BotApiUrl\\"].OutputValue' --output text"`,
+        `echo "2. Cache API URL: aws cloudformation describe-stacks --stack-name web3cdk-${props.environment}-cache-api --query 'Stacks[0].Outputs[?OutputKey==\\"CacheApiEndpoint\\"].OutputValue' --output text"`,
         `echo "3. sudo vi /etc/httpd/conf.d/${domainName}-le-ssl.conf"`,
         `echo "4. コメントアウトされたProxyPass設定を有効化し、[API_ID]を実際のIDに置換"`,
         `echo "5. sudo systemctl reload httpd"`,
@@ -219,7 +219,7 @@ EOF`,
       ),
       machineImage: ec2.MachineImage.latestAmazonLinux2023(),
       securityGroup: props.securityGroup,
-      keyName: props.keyName,
+      keyPair: props.keyName ? ec2.KeyPair.fromKeyPairName(this, 'KeyPair', props.keyName) : undefined,
       role: ec2Role,
       userData: userData,
       vpcSubnets: {

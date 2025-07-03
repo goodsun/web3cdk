@@ -109,7 +109,7 @@ if [ -n "$STACKS_OPTION" ]; then
     echo "🗑️  指定されたスタックを削除しています: $STACKS_OPTION"
     
     # スタックの存在確認
-    if npx cdk list 2>/dev/null | grep -q "${STACKS_OPTION}"; then
+    if aws cloudformation describe-stacks --stack-name "${STACKS_OPTION}" >/dev/null 2>&1; then
         echo "✓ ${STACKS_OPTION} が見つかりました"
         if npx cdk destroy ${STACKS_OPTION} --force; then
             echo "✅ ${STACKS_OPTION} の削除完了"
@@ -137,7 +137,7 @@ else
         echo "${description}を削除中..."
 
         # スタックの存在確認
-        if npx cdk list 2>/dev/null | grep -q "${stack_name}"; then
+        if aws cloudformation describe-stacks --stack-name "${stack_name}" >/dev/null 2>&1; then
             echo "✓ ${stack_name} が見つかりました"
             if npx cdk destroy ${stack_name} --force; then
                 echo "✅ ${stack_name} の削除完了"

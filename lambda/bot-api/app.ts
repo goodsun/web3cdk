@@ -1472,7 +1472,7 @@ app.get("/register.html", (req: Request, res: Response) => {
                 const signature = await signer.signMessage(message);
 
                 // サーバーに送信
-                const response = await fetch('/discord/register/verify', {
+                const response = await fetch('/api/bot/discord/register/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1483,6 +1483,12 @@ app.get("/register.html", (req: Request, res: Response) => {
                     })
                 });
 
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API Error:', response.status, errorText);
+                    throw new Error('API Error: ' + response.status);
+                }
+                
                 const result = await response.json();
 
                 document.getElementById('step3').classList.add('hidden');
@@ -1781,28 +1787,7 @@ app.get("/discord/info", async (req: Request, res: Response) => {
       return;
     }
 
-    const response = await fetch(
-      `https://discord.com/api/v10/guilds/${discordGuildId}`,
-      {
-        headers: {
-          Authorization: `Bot ${discordBotToken}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("Discord API error:", response.status, errorData);
-      res.status(response.status).json({
-        error: "Discord API request failed",
-        status: response.status,
-        details: errorData,
-      });
-      return;
-    }
-
-    const guild: any = await response.json();
+    const guild = await fetchDiscordAPI(`/guilds/${discordGuildId}`);
     res.json({
       id: guild.id,
       name: guild.name,
