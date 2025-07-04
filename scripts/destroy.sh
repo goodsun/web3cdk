@@ -2,6 +2,14 @@
 
 # CDK削除スクリプト - 安全なリソース削除
 
+# 自動モードまたは強制モードの確認
+FORCE_MODE=false
+for arg in "$@"; do
+    if [ "$arg" = "-f" ] || [ "$arg" = "--force" ] || [ "$REGRESSION_TEST" = "true" ]; then
+        FORCE_MODE=true
+    fi
+done
+
 echo ""
 echo -e "\033[31m╔══════════════════════════════════════════════════════════════════════════╗\033[0m"
 echo -e "\033[31m║                          🗑️  CDK スタック削除                            ║\033[0m"
@@ -40,9 +48,9 @@ echo "🗑️  $ENV 環境を削除します"
 echo "======================"
 
 # 環境の検証
-if [[ ! "$ENV" =~ ^(dev|stg|prod)$ ]]; then
+if [[ ! "$ENV" =~ ^(dev|stg|prod|test)$ ]]; then
     echo "❌ 無効な環境: $ENV"
-    echo "有効な選択肢: dev, stg, prod"
+    echo "有効な選択肢: dev, stg, prod, test"
     exit 1
 fi
 
@@ -96,7 +104,12 @@ if [ "$ENV" = "prod" ]; then
 else
     # 開発/ステージング環境でも確認
     echo ""
-    read -p "本当にスタックを削除しますか？ (yes/no): " confirm
+    if [ "$FORCE_MODE" = true ]; then
+        echo "✅ 強制モード: スタックを削除します"
+        confirm="yes"
+    else
+        read -p "本当にスタックを削除しますか？ (yes/no): " confirm
+    fi
     if [ "$confirm" != "yes" ]; then
         echo "削除がキャンセルされました"
         exit 0

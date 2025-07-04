@@ -3,6 +3,12 @@
 # CDKブートストラップスクリプト - アカウント・リージョンに1回だけ実行
 # 既存スタックがある場合は安全に更新されます（削除・再作成ではなく差分更新）
 
+# 自動モードの確認（環境変数またはコマンドライン引数）
+AUTO_MODE=false
+if [ "$1" = "--auto" ] || [ "$REGRESSION_TEST" = "true" ]; then
+    AUTO_MODE=true
+fi
+
 echo ""
 echo -e "\033[36m╔══════════════════════════════════════════════════════════════════════════════╗\033[0m"
 echo -e "\033[36m║                        🏗️  CDK ブートストラップ                              ║\033[0m"
@@ -46,7 +52,12 @@ else
 fi
 
 echo ""
-read -p "⚠️  このAWSアカウントでブートストラップを実行しますか？ (y/n): " confirm
+if [ "$AUTO_MODE" = true ]; then
+    echo "✅ 自動モード: ブートストラップを続行します"
+    confirm="y"
+else
+    read -p "⚠️  このAWSアカウントでブートストラップを実行しますか？ (y/n): " confirm
+fi
 
 if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
     echo ""
@@ -90,7 +101,12 @@ if aws cloudformation describe-stacks --stack-name $BOOTSTRAP_STACK --region $RE
     echo "   ✅ デプロイ済みスタックへの影響はありません"
     echo "   ✅ CDKの最新機能・権限設定に更新されます"
     echo ""
-    read -p "🤔 ブートストラップを再実行して更新しますか？ (y/n): " update_confirm
+    if [ "$AUTO_MODE" = true ]; then
+        echo "✅ 自動モード: ブートストラップを再実行して更新します"
+        update_confirm="y"
+    else
+        read -p "🤔 ブートストラップを再実行して更新しますか？ (y/n): " update_confirm
+    fi
     if [ "$update_confirm" != "y" ] && [ "$update_confirm" != "Y" ]; then
         echo "ℹ️  ブートストラップをスキップしました"
         exit 0

@@ -14,27 +14,6 @@ app.disable('x-powered-by');
 // Trust proxy for serverless environment
 app.set('trust proxy', true);
 
-// CORS middleware
-app.use((req: Request, res: Response, next: NextFunction): void => {
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['*'];
-  const origin = req.headers.origin;
-  
-  if (allowedOrigins.includes('*') || (origin && allowedOrigins.includes(origin))) {
-    res.header('Access-Control-Allow-Origin', origin || '*');
-  }
-  
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, X-Api-Key');
-  res.header('Access-Control-Max-Age', '86400');
-  
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-  
-  next();
-});
-
 // JSON parser with error handling
 app.use(express.json({ 
   limit: '1mb',

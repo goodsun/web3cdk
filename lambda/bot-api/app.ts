@@ -141,22 +141,6 @@ const conversationTableName = process.env.CONVERSATION_TABLE_NAME || "";
 // ミドルウェア
 app.use(express.json());
 
-// CORS設定
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Signature-Ed25519, X-Signature-Timestamp"
-  );
-
-  if (req.method === "OPTIONS") {
-    res.sendStatus(200);
-  } else {
-    next();
-  }
-});
-
 // Discord署名検証関数
 function verifyDiscordSignature(
   body: string,

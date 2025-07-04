@@ -5,6 +5,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as targets from 'aws-cdk-lib/aws-events-targets';
 import { Construct } from 'constructs';
+import { CorsConfig } from '../constructs/cors-config';
 
 interface CacheApiStackProps extends cdk.StackProps {
   environment: string;
@@ -62,11 +63,7 @@ export class CacheApiStack extends cdk.Stack {
         throttlingRateLimit: 10,
         metricsEnabled: true
       },
-      defaultCorsPreflightOptions: {
-        allowOrigins: process.env.CACHE_ALLOWED_ORIGINS?.split(',') || ['*'],
-        allowMethods: ['GET', 'POST', 'OPTIONS'],
-        allowHeaders: ['Content-Type', 'X-Api-Key']
-      }
+      defaultCorsPreflightOptions: CorsConfig.getCacheApiCorsOptions(environment)
     });
 
     // Lambda integration

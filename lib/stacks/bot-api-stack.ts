@@ -5,6 +5,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import * as path from 'path';
+import { CorsConfig } from '../constructs/cors-config';
 
 export interface BotApiStackProps extends cdk.StackProps {
   projectName: string;
@@ -119,11 +120,7 @@ export class BotApiStack extends cdk.Stack {
     this.api = new apigateway.RestApi(this, 'BotApi', {
       restApiName: `${props.projectName}-${props.environment}-bot-api`,
       description: 'Discord Bot API Gateway',
-      defaultCorsPreflightOptions: {
-        allowOrigins: [process.env.BOT_CORS_ORIGIN || '*'],
-        allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowHeaders: ['Content-Type', 'X-Amz-Date', 'Authorization', 'X-Api-Key'],
-      },
+      defaultCorsPreflightOptions: CorsConfig.getBotApiCorsOptions(props.environment),
       deployOptions: {
         stageName: 'bot',
         throttlingBurstLimit: 50,

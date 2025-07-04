@@ -212,6 +212,95 @@ npm run diff:prod
 npm run deploy:prod
 ```
 
+### 5. API Gateway ID の取得
+
+EC2のリバースプロキシ設定で必要なAPI Gateway IDの取得方法：
+
+#### Bot API の API ID 取得
+
+```bash
+# 開発環境
+aws cloudformation describe-stacks \
+  --stack-name "web3cdk-dev-bot-api" \
+  --query 'Stacks[0].Outputs[?OutputKey==`BotApiUrl`].OutputValue' \
+  --output text
+
+# ステージング環境
+aws cloudformation describe-stacks \
+  --stack-name "web3cdk-stg-bot-api" \
+  --query 'Stacks[0].Outputs[?OutputKey==`BotApiUrl`].OutputValue' \
+  --output text
+
+# 本番環境
+aws cloudformation describe-stacks \
+  --stack-name "web3cdk-prod-bot-api" \
+  --query 'Stacks[0].Outputs[?OutputKey==`BotApiUrl`].OutputValue' \
+  --output text
+```
+
+#### Cache API の API ID 取得
+
+```bash
+# 開発環境
+aws cloudformation describe-stacks \
+  --stack-name "web3cdk-dev-cache-api" \
+  --query 'Stacks[0].Outputs[?OutputKey==`CacheApiUrl`].OutputValue' \
+  --output text
+
+# ステージング環境
+aws cloudformation describe-stacks \
+  --stack-name "web3cdk-stg-cache-api" \
+  --query 'Stacks[0].Outputs[?OutputKey==`CacheApiUrl`].OutputValue' \
+  --output text
+
+# 本番環境
+aws cloudformation describe-stacks \
+  --stack-name "web3cdk-prod-cache-api" \
+  --query 'Stacks[0].Outputs[?OutputKey==`CacheApiUrl`].OutputValue' \
+  --output text
+```
+
+#### 取得したURLからAPI IDを確認
+
+取得したURLの形式：
+```
+https://[API_ID].execute-api.[region].amazonaws.com/[stage]/
+```
+
+例：
+```
+https://zfs7rzq2q9.execute-api.ap-northeast-1.amazonaws.com/cacheapi/
+         ↑ このzfs7rzq2q9がAPI ID
+```
+
+#### EC2のApache設定への反映
+
+1. EC2インスタンスにSSH接続
+2. Apache設定ファイルを編集：
+   ```bash
+   sudo vi /etc/httpd/conf.d/[ドメイン名]-le-ssl.conf
+   ```
+
+3. 取得したAPI IDを使用してプロキシ設定を更新：
+   ```apache
+   # Bot API proxy
+   ProxyPass /api/bot/ https://[API_ID].execute-api.ap-northeast-1.amazonaws.com/bot/
+   ProxyPassReverse /api/bot/ https://[API_ID].execute-api.ap-northeast-1.amazonaws.com/bot/
+   
+   # Cache API proxy
+   ProxyPass /api/cache/ https://[API_ID].execute-api.ap-northeast-1.amazonaws.com/cache/
+   ProxyPassReverse /api/cache/ https://[API_ID].execute-api.ap-northeast-1.amazonaws.com/cache/
+   ```
+
+4. Apache設定をリロード：
+   ```bash
+   sudo systemctl reload httpd
+   ```
+
+**注意事項:**
+- API IDはスタックをデプロイするたびに変更される可能性があります
+- EC2の`user-data.sh`スクリプトにAPI URLが自動的に設定されますが、手動設定が必要な場合は上記の手順を使用してください
+
 ## 関連ドキュメント
 
 - [CDK Bootstrap Guide](./cdk-bootstrap-guide.md)

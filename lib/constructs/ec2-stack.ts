@@ -67,8 +67,6 @@ export class Ec2Stack extends cdk.Stack {
     "constantinopleBlock": 0,
     "petersburgBlock": 0,
     "istanbulBlock": 0,
-    "berlinBlock": 0,
-    "londonBlock": 0,
     "clique": {
       "period": 0,
       "epoch": 30000
@@ -79,21 +77,25 @@ export class Ec2Stack extends cdk.Stack {
       "balance": "${process.env.GETH_INITIAL_BALANCE || '500000000000000000000000'}"
     }
   },
-  "coinbase": "0x0000000000000000000000000000000000000000",
+  "coinbase": "${process.env.GETH_ADDRESS || '0x59d2e0E4DCf3Dc47e83364D4E9A91b310e713248'}",
   "difficulty": "0x1",
-  "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000${(process.env.GETH_ADDRESS || '0x59d2e0E4DCf3Dc47e83364D4E9A91b310e713248').substring(2)}0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "extraData": "0x4175677572000000000000000000000000000000000000000000000000000000${(process.env.GETH_ADDRESS || '0x59d2e0E4DCf3Dc47e83364D4E9A91b310e713248').substring(2)}0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
   "gasLimit": "0x632EA0",
-  "nonce": "0x0000000000000042",
-  "mixhash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "nonce": "0x0",
+  "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
   "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-  "timestamp": "0x00"
+  "timestamp": "0x59e50516"
 }
 GENESIS_EOF`,
       "cd /opt/geth && geth --datadir data init genesis.json",
+      "mkdir -p /opt/geth/keystore",
       `echo "${process.env.GETH_PASSWORD || 'defaultpassword'}" > /opt/geth/password.txt`,
       `echo "${process.env.GETH_PRIVATE_KEY || ''}" > /opt/geth/privatekey.txt`,
       "cd /opt/geth && geth --datadir data account import --password password.txt privatekey.txt || echo 'Account import failed'",
-      "rm -f /opt/geth/privatekey.txt /opt/geth/password.txt",
+      "cp -r /opt/geth/data/keystore/* /opt/geth/keystore/ 2>/dev/null || true",
+      "rm -f /opt/geth/privatekey.txt",
+      "chmod 600 /opt/geth/password.txt",
+      "chown -R ec2-user:ec2-user /opt/geth",
       `cat > /opt/geth/start-geth.sh << 'START_SCRIPT_EOF'
 #!/bin/bash
 cd /opt/geth
@@ -106,6 +108,9 @@ geth --datadir data \\
   --ws.api eth,net,web3,personal,miner \\
   --ws.origins "*" \\
   --allow-insecure-unlock \\
+  --keystore /opt/geth/keystore \\
+  --password /opt/geth/password.txt \\
+  --unlock ${(process.env.GETH_ADDRESS || '0x59d2e0E4DCf3Dc47e83364D4E9A91b310e713248').substring(2)} \\
   --mine --miner.threads 1 \\
   --miner.etherbase ${process.env.GETH_ADDRESS || '0x59d2e0E4DCf3Dc47e83364D4E9A91b310e713248'} \\
   --nodiscover \\
@@ -123,7 +128,7 @@ Type=simple
 User=ec2-user
 Group=ec2-user
 WorkingDirectory=/opt/geth
-ExecStart=/usr/local/bin/geth --datadir data --networkid ${process.env.GETH_CHAIN_ID || 21201} --http --http.addr 0.0.0.0 --http.port 8545 --http.corsdomain "*" --http.api eth,net,web3,personal,miner --ws --ws.addr 0.0.0.0 --ws.port 8546 --ws.api eth,net,web3,personal,miner --ws.origins "*" --allow-insecure-unlock --mine --miner.threads 1 --miner.etherbase ${process.env.GETH_ADDRESS || '0x59d2e0E4DCf3Dc47e83364D4E9A91b310e713248'} --nodiscover
+ExecStart=/usr/local/bin/geth --datadir data --networkid ${process.env.GETH_CHAIN_ID || 21201} --http --http.addr 0.0.0.0 --http.port 8545 --http.corsdomain "*" --http.api eth,net,web3,personal,miner --ws --ws.addr 0.0.0.0 --ws.port 8546 --ws.api eth,net,web3,personal,miner --ws.origins "*" --allow-insecure-unlock --keystore /opt/geth/keystore --password /opt/geth/password.txt --unlock ${(process.env.GETH_ADDRESS || '0x59d2e0E4DCf3Dc47e83364D4E9A91b310e713248').substring(2)} --mine --miner.threads 1 --miner.etherbase ${process.env.GETH_ADDRESS || '0x59d2e0E4DCf3Dc47e83364D4E9A91b310e713248'} --nodiscover
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -188,12 +193,7 @@ EOF`,
     ProxyPass /rpc http://localhost:8545\\
     ProxyPassReverse /rpc http://localhost:8545\\
 \\
-    # レスポンスヘッダーの設定\\
-    <LocationMatch "^/(api|rpc)/">\\
-        Header always set Access-Control-Allow-Origin "*"\\
-        Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"\\
-        Header always set Access-Control-Allow-Headers "Content-Type, Authorization"\\
-    </LocationMatch>' /etc/httpd/conf.d/${domainName}-le-ssl.conf
+    # API Gatewayが既にCORSヘッダーを設定しているため、Apacheでは設定しない' /etc/httpd/conf.d/${domainName}-le-ssl.conf
             systemctl reload httpd
           fi
         fi`,

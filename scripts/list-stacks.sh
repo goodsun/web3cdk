@@ -127,6 +127,60 @@ else
 fi
 
 echo ""
+
+# API Gateway URLを表示する関数
+show_api_gateway_urls() {
+    echo "🌐 API Gateway URLs:"
+    echo "===================="
+    
+    # プロジェクト名を取得
+    local project_name=""
+    if [ -f ".env.local" ]; then
+        project_name=$(grep -E '^PROJECT_NAME=' .env.local | cut -d= -f2 | tr -d '"' | tr -d "'")
+    fi
+    
+    if [ -z "$project_name" ]; then
+        project_name="web3cdk"
+    fi
+    
+    # 環境ごとにAPI URLを取得
+    for env in dev stg prod; do
+        echo ""
+        echo "📍 環境: $env"
+        echo "-------------"
+        
+        # Bot API URL
+        local bot_stack_name="${project_name}-${env}-bot-api"
+        local bot_api_url=$(aws cloudformation describe-stacks \
+            --stack-name "$bot_stack_name" \
+            --region $REGION \
+            --query 'Stacks[0].Outputs[?OutputKey==`BotApiUrl`].OutputValue' \
+            --output text 2>/dev/null)
+        
+        if [ ! -z "$bot_api_url" ] && [ "$bot_api_url" != "None" ]; then
+            echo "  🤖 Bot API: $bot_api_url"
+        else
+            echo "  🤖 Bot API: (未デプロイ)"
+        fi
+        
+        # Cache API URL
+        local cache_stack_name="${project_name}-${env}-cache-api"
+        local cache_api_url=$(aws cloudformation describe-stacks \
+            --stack-name "$cache_stack_name" \
+            --region $REGION \
+            --query 'Stacks[0].Outputs[?OutputKey==`CacheApiUrl`].OutputValue' \
+            --output text 2>/dev/null)
+        
+        if [ ! -z "$cache_api_url" ] && [ "$cache_api_url" != "None" ]; then
+            echo "  💾 Cache API: $cache_api_url"
+        else
+            echo "  💾 Cache API: (未デプロイ)"
+        fi
+    done
+    
+    echo ""
+}
+
 # プロジェクト設定を表示する関数
 show_project_config_only() {
     echo "🔧 現在のプロジェクト設定:"
@@ -156,5 +210,10 @@ show_project_config_only() {
     echo "  npm run deploy:dev  # 開発環境にデプロイ"
 }
 
-# AWS情報が利用可能な場合のみスタック一覧を表示
+# AWS情報が利用可能な場合のみAPI Gateway URLを表示
+if command -v aws &> /dev/null && aws sts get-caller-identity &> /dev/null 2>&1; then
+    show_api_gateway_urls
+fi
+
+# プロジェクト設定の表示
 show_project_config_only
