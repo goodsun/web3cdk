@@ -1,5 +1,5 @@
 {
-  "app": "npx ts-node --project tools/tsconfig.json src/bin/web3cdk.ts",
+  "app": "npx ts-node --project tools/tsconfig.json bin/web3cdk.ts",
   "watch": {
     "include": [
       "**"

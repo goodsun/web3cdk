@@ -45,3 +45,6 @@ test/
 # Backup files (exclude README.md)
 backup/*
 !backup/README.md
+*.d.ts
+*.js
+*.js.map

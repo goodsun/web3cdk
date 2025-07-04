@@ -735,3 +735,476 @@ EC2_MINIMAL_RESET=true npm run deploy:dev
 6. **2段階リセットでLet's Encrypt制限を回避**
 
 これらの対策により、Let's Encrypt制限とSSHキー競合の両方の問題を事前に防ぎ、安全な開発環境を維持できるようになりました。
+
+## 🧪 テストモード機能の設計と削除の教訓（2025-07-03）
+
+### テストモード実装の良い意図と致命的な欠陥
+#### 元々の設計意図
+- **開発効率化**: 実際のDiscord APIを呼ばずに開発を進める
+- **API制限回避**: Discord API制限に引っかからない
+- **レスポンス高速化**: モックデータで即座にレスポンス
+
+#### 実装されていた機能
+```typescript
+const isTestMode = process.env.DISCORD_TEST_MODE === 'true';
+
+// 1. 署名検証スキップ
+if (isTestMode) {
+  console.log('[TEST MODE] Skipping Discord signature verification');
+  return true;
+}
+
+// 2. API呼び出しスキップ
+if (isTestMode) {
+  console.log(`[TEST MODE] Skipping Discord API call: ${endpoint}`);
+  return getMockDiscordData(endpoint);
+}
+
+// 3. 設定検証スキップ
+if (isTestMode) {
+  console.log('[TEST MODE] Skipping Discord config validation');
+  return true;
+}
+```
+
+### テストモードが引き起こした問題
+#### 1. **機能完全無効化の錯覚**
+```bash
+# ユーザー視点での問題
+curl "https://api/discord/member/123"
+# → モックデータが返される
+# → 「APIは動いている」と錯覚
+# → 実際は本物のAPIが全く動いていない
+```
+
+#### 2. **デバッグ情報の欠如**
+- エラー情報がモックデータで隠蔽される
+- 実際のAPI呼び出しが発生しないため、認証エラーが発見できない
+- 本番で初めて問題が発覚する危険性
+
+#### 3. **環境変数の残骸問題**
+```typescript
+// CDKスタック定義に残存
+DISCORD_TEST_MODE: process.env.DISCORD_TEST_MODE || 'false',
+
+// .env.devファイルから削除済み
+// ↓
+// 実行時にundefinedになり、文字列比較で予期しない動作
+```
+
+### 設計上の根本的な問題点
+
+#### 1. **テスト用機能の本番混入**
+- **問題**: プロダクションコードにテスト用ロジックが混在
+- **影響**: 可読性低下、保守性悪化、意図しない動作
+- **原則違反**: 関心の分離（Separation of Concerns）
+
+#### 2. **機能の完全バイパス**
+- **問題**: 核となる機能（認証、API呼び出し）を完全にスキップ
+- **影響**: 実際の動作確認ができない
+- **代替案**: 部分的なモック、Sandboxモード
+
+#### 3. **環境変数による制御の脆弱性**
+- **問題**: 環境変数の設定ミスで本番動作が変わる
+- **影響**: 予期しない動作、デバッグ困難
+- **対策**: より明示的なモード切り替え
+
+### より良いテスト戦略
+
+#### 1. **Sandboxモードの活用**
+```typescript
+// ❌ 完全バイパス
+if (isTestMode) {
+  return getMockData();
+}
+
+// ✅ Discord Test Guild使用
+const guildId = process.env.NODE_ENV === 'test' 
+  ? process.env.DISCORD_TEST_GUILD_ID 
+  : process.env.DISCORD_GUILD_ID;
+```
+
+#### 2. **モック階層の分離**
+```typescript
+// ❌ プロダクションコードに混在
+if (isTestMode) {
+  return mockResponse;
+}
+await realDiscordAPI();
+
+// ✅ Dependency Injection
+class DiscordService {
+  constructor(private apiClient: DiscordApiClient) {}
+}
+
+// テスト時: MockDiscordApiClient
+// 本番時: RealDiscordApiClient
+```
+
+#### 3. **段階的なテスト環境**
+```bash
+# 開発環境の階層化
+local    # ローカル開発（モック使用）
+dev      # 開発サーバー（実API + テストデータ）
+staging  # ステージング（実API + 本番類似データ）
+prod     # 本番（実API + 本番データ）
+```
+
+### 削除作業で発見した設計パターン
+
+#### 1. **影響範囲の予想以上の広さ**
+```bash
+# 削除が必要だった箇所
+- lambda/bot-api/app.ts（メインロジック）
+- lib/stacks/bot-api-stack.ts（環境変数定義）
+- .env.dev（環境変数設定）
+- docs/testing/discord-test-mode.md（ドキュメント）
+```
+
+#### 2. **条件分岐の複雑化**
+```typescript
+// 削除前：多重条件分岐
+if (isTestMode) {
+  // テスト用処理
+} else {
+  if (!discordGuildId) {
+    // エラー処理
+  }
+  if (!discordBotToken) {
+    // エラー処理
+  }
+  // 実際の処理
+}
+
+// 削除後：単純な構造
+if (!discordGuildId) {
+  // エラー処理
+}
+if (!discordBotToken) {
+  // エラー処理
+}
+// 実際の処理
+```
+
+### テストモード削除の即座効果
+
+#### 1. **実際の問題の顕在化**
+- 隠されていた認証エラーが露呈
+- 実際のAPI制限やネットワーク問題の発見
+- レスポンス形式の違いの明確化
+
+#### 2. **コードの単純化**
+- 条件分岐の削減（約100行の削除）
+- 可読性の向上
+- デバッグの容易化
+
+#### 3. **運用の信頼性向上**
+- 開発環境と本番環境の挙動一致
+- 想定外の動作の排除
+- 早期問題発見
+
+### 今後のテスト機能設計指針
+
+#### 1. **Clean Architecture原則の適用**
+```typescript
+// インターフェース分離
+interface DiscordApiClient {
+  getMember(userId: string): Promise<Member>;
+}
+
+// 実装の分離
+class RealDiscordApiClient implements DiscordApiClient {}
+class MockDiscordApiClient implements DiscordApiClient {}
+```
+
+#### 2. **環境による依存注入**
+```typescript
+// DIコンテナでの切り替え
+const apiClient = container.resolve<DiscordApiClient>(
+  process.env.NODE_ENV === 'test' ? 'mock' : 'real'
+);
+```
+
+#### 3. **段階的なテスト戦略**
+- **Unit Test**: 完全モック
+- **Integration Test**: Test Guild使用
+- **E2E Test**: Staging環境
+- **Production**: 実環境
+
+### 重要な教訓
+
+#### 1. **機能フラグは慎重に**
+- 本番コードから完全に分離する
+- 影響範囲を事前に把握する
+- 削除計画を最初から立てる
+
+#### 2. **テストは本番に近い環境で**
+- モックは最小限に留める
+- 実際のAPIを使ったテストを重視
+- 段階的な検証を行う
+
+#### 3. **コードの単純性を保つ**
+- 条件分岐の複雑化を避ける
+- 関心の分離を徹底する
+- 可読性を最優先にする
+
+#### 4. **早期の問題発見が重要**
+- 開発段階で実際の問題に直面する
+- 本番で初めて問題が発覚することを避ける
+- 継続的な実環境テストの実施
+
+この経験により、「便利なテスト機能」が「開発効率を阻害する罠」になり得ることを学びました。機能の設計時から削除までを考慮し、Clean Architectureの原則に従うことの重要性を再認識しました。
+
+## 🏗️ ディレクトリ構造統一とコードベースクリーンアップの実践（2025-07-03）
+
+### 重複ディレクトリ構造の問題発見
+
+#### 発見された構造的混乱
+```bash
+# 新旧混在状態
+src/lib/          # 旧構造
+├── web3cdk-stack.ts
+├── web3cdk-network-stack.ts
+└── simple-stack-props.ts
+
+lib/              # 新構造  
+├── stacks/
+│   ├── bot-api-stack.ts
+│   └── cache-api-stack.ts
+└── constructs/
+    ├── ec2-stack.ts
+    └── network-stack.ts
+
+# CDKエントリーポイント
+src/bin/web3cdk.ts   # 両方を混在してインポート
+```
+
+#### インポートの混乱
+```typescript
+// 旧新混在のインポート（問題）
+import { Web3CdkStorageStack } from '../lib/web3cdk-stack';           // 旧
+import { Web3CdkNetworkStack } from '../lib/web3cdk-network-stack';   // 旧  
+import { Ec2Stack } from '../../lib/constructs/ec2-stack';             // 新
+import { CacheApiStack } from '../../lib/stacks/cache-api-stack';      // 新
+import { BotApiStack } from '../../lib/stacks/bot-api-stack';          // 新
+```
+
+### 統一への段階的アプローチ
+
+#### Step 1: 新構造への移行準備
+```bash
+# ディレクトリ移動
+mv src/bin /Users/goodsun/develop/vc/web3cdk/bin
+
+# ファイル統合
+cp src/lib/web3cdk-network-stack.ts lib/constructs/network-stack.ts
+cp src/lib/web3cdk-stack.ts lib/stacks/storage-stack.ts
+```
+
+#### Step 2: 設定ファイルの更新
+```json
+// cdk.json
+{
+  "app": "npx ts-node --project tools/tsconfig.json bin/web3cdk.ts"
+}
+
+// tools/tsconfig.json
+{
+  "include": [
+    "../bin/**/*.ts",
+    "../lib/**/*.ts", 
+    "../test/**/*.ts"
+  ]
+}
+```
+
+#### Step 3: インポート統一
+```typescript
+// 統一後のインポート
+import { Web3CdkStorageStack } from '../lib/stacks/storage-stack';
+import { Web3CdkNetworkStack } from '../lib/constructs/network-stack';
+import { Ec2Stack } from '../lib/constructs/ec2-stack';
+import { CacheApiStack } from '../lib/stacks/cache-api-stack';  
+import { BotApiStack } from '../lib/stacks/bot-api-stack';
+```
+
+#### Step 4: 旧構造の完全削除
+```bash
+rm -rf src/    # 旧ディレクトリ完全削除
+```
+
+### TypeScript型定義の問題と解決
+
+#### 依存関係エラーの発生
+```typescript
+// エラー：存在しないインターフェース参照
+import { SimpleStackProps } from './simple-stack-props';  // ❌
+
+// 解決：インライン定義
+export interface NetworkStackProps extends cdk.StackProps {
+  projectName: string;
+  environment: string;
+}  // ✅
+```
+
+#### ビルド成果物の管理改善
+```bash
+# .gitignoreに追加
+*.d.ts
+*.js
+*.js.map
+
+# ビルド成果物のGit管理除外
+```
+
+### 統一後の明確な構造
+
+#### 最終的なディレクトリ構造
+```bash
+/
+├── bin/                    # CDKエントリーポイント
+│   └── web3cdk.ts
+├── lib/                    # CDKスタック定義
+│   ├── constructs/         # 再利用可能なコンストラクト
+│   │   ├── ec2-stack.ts
+│   │   └── network-stack.ts
+│   └── stacks/             # メインスタック
+│       ├── bot-api-stack.ts
+│       ├── cache-api-stack.ts
+│       └── storage-stack.ts
+├── lambda/                 # Lambda関数コード
+├── scripts/                # 運用スクリプト
+├── docs/                   # ドキュメント
+└── tools/                  # 開発ツール設定
+```
+
+### 不要ファイルの一括削除
+
+#### 削除対象の特定と実行
+```bash
+# テスト用ファイル
+rm test-payload.json payload.txt response.json
+
+# 削除済み機能のドキュメント  
+rm docs/testing/discord-test-mode.md
+
+# 旧ディレクトリ構造
+rm -rf src/
+```
+
+### 構造統一の技術的効果
+
+#### 1. **import パスの単純化**
+```typescript
+// 統一前：相対パス地獄
+import { Ec2Stack } from '../../lib/constructs/ec2-stack';
+
+// 統一後：一貫したパス
+import { Ec2Stack } from '../lib/constructs/ec2-stack';
+```
+
+#### 2. **責務の明確化**
+```bash
+constructs/    # 再利用可能な部品
+stacks/        # ビジネスロジック固有
+bin/           # エントリーポイント
+lambda/        # 実行コード
+```
+
+#### 3. **新規開発者の学習コスト削減**
+- ファイルの配置場所が直感的
+- 混在による混乱を排除
+- 一貫性のある命名規則
+
+### CDKプロジェクトの構造設計パターン
+
+#### AWS CDK Best Practicesに準拠
+```typescript
+// Construct（部品）
+export class NetworkConstruct extends Construct {}
+
+// Stack（アプリケーション）  
+export class BotApiStack extends cdk.Stack {}
+
+// App（システム全体）
+const app = new cdk.App();
+```
+
+#### スケールする構造
+```bash
+lib/
+├── constructs/          # 横断的に使用
+│   ├── network/
+│   ├── security/
+│   └── monitoring/
+├── stacks/              # ドメイン固有
+│   ├── api/
+│   ├── storage/
+│   └── compute/
+└── shared/              # 共通定義
+    ├── interfaces/
+    └── constants/
+```
+
+### 残骸クリーンアップの複合効果
+
+#### 1. **ビルド時間の短縮**
+- 不要ファイルの除外
+- TypeScript コンパイル対象の最適化
+- 型チェックの高速化
+
+#### 2. **IDE パフォーマンス向上**
+- インデックス作成対象の削減
+- 自動補完の精度向上
+- ファイル検索の高速化
+
+#### 3. **デプロイメントの信頼性向上**
+- 不要な環境変数の削除
+- 明確な依存関係
+- 予期しない動作の排除
+
+### 継続的クリーンアップの仕組み
+
+#### 1. **自動化されたチェック**
+```bash
+# package.json scripts
+"lint:structure": "scripts/check-structure.sh",
+"clean:artifacts": "rm **/*.d.ts **/*.js **/*.js.map"
+```
+
+#### 2. **定期的なレビュー**
+- 月次での不要ファイル確認
+- 依存関係の見直し
+- ディレクトリ構造の最適化
+
+#### 3. **新規追加時のルール**
+- ファイル配置の事前確認
+- 命名規則の遵守
+- 重複チェック
+
+### 重要な学びとベストプラクティス
+
+#### 1. **構造統一は一気に行う**
+- 段階的変更は混乱を長期化させる
+- まとめて実施することでリグレッションを防ぐ
+- チーム全体での合意形成が重要
+
+#### 2. **自動化ツールの活用**
+```bash
+# TypeScript の厳密な設定
+"strict": true,
+"noUnusedLocals": true,
+"noUnusedParameters": true
+```
+
+#### 3. **ドキュメント更新の重要性**
+- 構造変更時は必ずREADME更新
+- 開発者ガイドの同期
+- アーキテクチャ図の更新
+
+#### 4. **漸進的改善の価値**
+- 完璧を求めず段階的に改善
+- 実用性を保ちながら整理
+- チーム全体の生産性向上を重視
+
+この統一作業により、コードベースの可読性、保守性、拡張性が大幅に向上し、今後の開発効率が大きく改善されることが期待されます。特に新規参加者の学習コストが大幅に削減され、より多くの開発者が貢献しやすい環境が整いました。

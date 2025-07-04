@@ -2,11 +2,11 @@
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import { Web3CdkStorageStack } from '../lib/web3cdk-stack';
-import { Web3CdkNetworkStack } from '../lib/web3cdk-network-stack';
-import { Ec2Stack } from '../../lib/constructs/ec2-stack';
-import { CacheApiStack } from '../../lib/stacks/cache-api-stack';
-import { BotApiStack } from '../../lib/stacks/bot-api-stack';
+import { Web3CdkStorageStack } from '../lib/stacks/storage-stack';
+import { Web3CdkNetworkStack } from '../lib/constructs/network-stack';
+import { Ec2Stack } from '../lib/constructs/ec2-stack';
+import { CacheApiStack } from '../lib/stacks/cache-api-stack';
+import { BotApiStack } from '../lib/stacks/bot-api-stack';
 
 /**
  * CDKアプリケーションのエントリーポイント

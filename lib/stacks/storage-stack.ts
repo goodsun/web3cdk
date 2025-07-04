@@ -1,7 +1,10 @@
 import * as cdk from 'aws-cdk-lib';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
-import { SimpleStackProps } from './simple-stack-props';
+export interface StorageStackProps extends cdk.StackProps {
+  projectName: string;
+  environment: string;
+}
 
 /**
  * Web3 CDK ストレージスタック
@@ -10,7 +13,7 @@ import { SimpleStackProps } from './simple-stack-props';
 export class Web3CdkStorageStack extends cdk.Stack {
   public readonly storageBucket: s3.Bucket;
 
-  constructor(scope: Construct, id: string, props: SimpleStackProps) {
+  constructor(scope: Construct, id: string, props: StorageStackProps) {
     super(scope, id, props);
 
     // ストレージ機能
@@ -25,7 +28,7 @@ export class Web3CdkStorageStack extends cdk.Stack {
   /**
    * メインストレージバケットの作成
    */
-  private createStorageBucket(props: SimpleStackProps): s3.Bucket {
+  private createStorageBucket(props: StorageStackProps): s3.Bucket {
     const bucketName = `${props.projectName}-${props.environment}-storage-${this.account?.slice(-6)}`;
     
     const bucket = new s3.Bucket(this, 'StorageBucket', {
