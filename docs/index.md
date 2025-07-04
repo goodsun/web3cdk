@@ -54,13 +54,16 @@ Web3 CDKは、AWS CDKをシンプルかつ効率的に立ち上げるための�
 | [CDKベストプラクティス](checklists/cdk-best-practices-checklist.md) | CDK開発時のベストプラクティス確認項目 | 開発者 |
 | [ドキュメント整合性監査](checklists/documentation-audit-checklist.md) | ドキュメントと実装の整合性確認項目 | 全ユーザー |
 
-## 🧪 テスト仕様
+## 🧪 テスト・品質保証
 
-品質保証のためのテスト仕様書です。
+品質保証のためのテスト仕様書とガイド集です。
 
 | ドキュメント | 説明 | 対象 |
 |-------------|------|------|
-| [**スタックテスト仕様**](testing/stack-test-specifications.md) | 🆕 各スタックのデプロイ後テスト手順 | 開発者・運用担当者 |
+| [**リグレッションテスト実行ガイド**](testing/regression-test-guide.md) | 🆕 自動リグレッションテストの実行方法 | 開発者・QA担当者 |
+| [**test環境ガイド**](testing/test-environment-guide.md) | 🆕 リグレッションテスト専用環境の使用方法 | 開発者・運用担当者 |
+| [リグレッションテスト仕様書](testing/regression-test-plan.md) | テスト項目と実行計画の詳細 | QA担当者・開発者 |
+| [スタックテスト仕様](testing/stack-test-specifications.md) | 各スタックのデプロイ後テスト手順 | 開発者・運用担当者 |
 
 ## 📋 計画書
 
@@ -101,6 +104,12 @@ Web3 CDKは、AWS CDKをシンプルかつ効率的に立ち上げるための�
 2. [リバースプロキシ調査報告書](development/httpd_reverse_proxy_investigation_report.md) でプロキシ設定のトラブルシューティング方法を確認
 3. [CDKベストプラクティス](checklists/cdk-best-practices-checklist.md) で運用品質を確保
 4. [コンソール色設定ガイド](development/console-color-guide.md) で開発環境を整備
+
+### 🧪 テスト・品質保証担当の方
+1. [**リグレッションテスト実行ガイド**](testing/regression-test-guide.md) で自動テストの実行方法を確認
+2. [**test環境ガイド**](testing/test-environment-guide.md) でテスト専用環境の使用方法を理解
+3. [リグレッションテスト仕様書](testing/regression-test-plan.md) でテスト項目と計画を確認
+4. [スタックテスト仕様](testing/stack-test-specifications.md) で各コンポーネントのテスト手順を実行
 
 ## 💡 ドキュメントの更新について
 

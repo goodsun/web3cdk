@@ -27,9 +27,9 @@ echo "🔍 $ENV 環境の差分を確認します"
 echo "============================"
 
 # 環境の検証
-if [[ ! "$ENV" =~ ^(dev|stg|prod)$ ]]; then
+if [[ ! "$ENV" =~ ^(dev|stg|prod|test)$ ]]; then
     echo "❌ 無効な環境: $ENV"
-    echo "有効な選択肢: dev, stg, prod"
+    echo "有効な選択肢: dev, stg, prod, test"
     exit 1
 fi
 
